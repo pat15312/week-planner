@@ -288,8 +288,7 @@ export default function App() {
   >(null);
 
   useEffect(() => {
-    const isProd = typeof process !== "undefined" && (process as any)?.env?.NODE_ENV === "production";
-    if (!isProd) runSelfTests();
+    if (import.meta.env.DEV) runSelfTests();
   }, []);
 
   const activePlan = useMemo<Plan>(() => plans.find((p) => p.id === activePlanId) ?? plans[0], [plans, activePlanId]);
