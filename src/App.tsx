@@ -809,142 +809,31 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="mx-auto max-w-[1400px] p-4">
-        <header className="mb-6 flex flex-col items-center text-center">
-          <div>
-            <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
-            <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
-              <span className="text-zinc-300">Plan</span>
-              <select
-                value={activePlan.id}
-                onChange={(e) => setActivePlanId(e.target.value)}
-                className="rounded-xl bg-zinc-950 px-2 py-1 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
-              >
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => openPlanModal("new")}
-                className="rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
-                title="New plan"
-              >
-                New
-              </button>
-              <button
-                onClick={() => openPlanModal("rename")}
-                className="rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
-                title="Rename plan"
-              >
-                Rename
-              </button>
-              <button
-                onClick={() => openPlanModal("duplicate")}
-                className="flex items-center gap-1 rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
-                title="Duplicate plan"
-              >
-                <Copy className="h-3 w-3" />
-                Duplicate
-              </button>
-              <button
-                onClick={() => openPlanModal("delete")}
-                disabled={plans.length <= 1}
-                className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs ring-1 transition ${
-                  plans.length <= 1 ? "bg-zinc-950 text-zinc-500 ring-zinc-800" : "bg-zinc-950 ring-zinc-800 hover:bg-zinc-800"
-                }`}
-                title={plans.length <= 1 ? "You must keep at least one plan" : "Delete plan"}
-              >
-                <Trash2 className="h-3 w-3" />
-                Delete
-              </button>
-            </div>
-
-            <button
-              onClick={() => updateActivePlan({ tool: "paint" })}
-              className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-sm shadow-sm transition ${
-                activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950" : "bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
-              }`}
-              title="Paint tool"
-            >
-              <Paintbrush className="h-4 w-4" />
-              Paint
-            </button>
-
-            <button
-              onClick={() => updateActivePlan({ tool: "erase" })}
-              className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-sm shadow-sm transition ${
-                activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950" : "bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
-              }`}
-              title="Eraser tool"
-            >
-              <Eraser className="h-4 w-4" />
-              Erase
-            </button>
-
-            <button
-              onClick={openExport}
-              className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm shadow-sm transition hover:bg-zinc-800"
-              title="Export / Import"
-            >
-              <Download className="h-4 w-4" />
-              Export / Import
-            </button>
-
-            <div className="flex items-center gap-1 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
-              <span className="px-2 text-zinc-300">View</span>
-              {([
-                { k: "5", label: "5m" },
-                { k: "15", label: "15m" },
-                { k: "60", label: "1h" },
-              ] as const).map((opt) => (
-                <button
-                  key={opt.k}
-                  onClick={() => setTimeScale(opt.k)}
-                  className={`rounded-xl px-2 py-1 text-xs ring-1 transition ${
-                    timeScale === opt.k
-                      ? "bg-zinc-100 text-zinc-950 ring-zinc-200"
-                      : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
-                  }`}
-                  title={`Show ${opt.label} blocks`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+      <div className="mx-auto flex max-w-[1400px] gap-4 p-4">
+        <aside className="w-[360px] shrink-0 rounded-3xl bg-zinc-900/60 p-4 shadow-sm ring-1 ring-zinc-800">
+          <div className="mb-4 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
+            <div className="flex items-center justify-between">
+              <span className="text-zinc-300">Free time</span>
+              <span className="rounded-xl bg-zinc-900 px-2 py-1 text-sm ring-1 ring-zinc-800">
+                {formatMinutes(allocationSummary.freeMinutes)}
+              </span>
             </div>
           </div>
-        </header>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr]">
-          <aside className="rounded-3xl bg-zinc-900/60 p-4 shadow-sm ring-1 ring-zinc-800">
-            <div className="mb-4 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-300">Free time</span>
-                <span className="rounded-xl bg-zinc-900 px-2 py-1 text-sm ring-1 ring-zinc-800">
-                  {formatMinutes(allocationSummary.freeMinutes)}
-                </span>
-              </div>
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <div className="text-lg font-semibold">Activities</div>
             </div>
+            <button
+              onClick={addActivity}
+              className="flex items-center gap-2 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 shadow-sm transition hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" />
+              Add
+            </button>
+          </div>
 
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <div className="text-lg font-semibold">Activities</div>
-              </div>
-              <button
-                onClick={addActivity}
-                className="flex items-center gap-2 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 shadow-sm transition hover:opacity-90"
-              >
-                <Plus className="h-4 w-4" />
-                Add
-              </button>
-            </div>
-
-            <div className="space-y-2">
+          <div className="space-y-2">
               {activePlan.activities.map((a) => {
                 const Icon = getIconComponent(a.icon);
                 const selected = a.id === activePlan.selectedActivityId;
@@ -1198,6 +1087,117 @@ export default function App() {
             </div>
           </aside>
 
+        <div className="flex flex-1 flex-col">
+          <div className="mb-6 flex flex-col items-center text-center">
+            <div>
+              <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
+              <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
+                <span className="text-zinc-300">Plan</span>
+                <select
+                  value={activePlan.id}
+                  onChange={(e) => setActivePlanId(e.target.value)}
+                  className="rounded-xl bg-zinc-950 px-2 py-1 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
+                >
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => openPlanModal("new")}
+                  className="rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
+                  title="New plan"
+                >
+                  New
+                </button>
+                <button
+                  onClick={() => openPlanModal("rename")}
+                  className="rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
+                  title="Rename plan"
+                >
+                  Rename
+                </button>
+                <button
+                  onClick={() => openPlanModal("duplicate")}
+                  className="flex items-center gap-1 rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
+                  title="Duplicate plan"
+                >
+                  <Copy className="h-3 w-3" />
+                  Duplicate
+                </button>
+                <button
+                  onClick={() => openPlanModal("delete")}
+                  disabled={plans.length <= 1}
+                  className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs ring-1 transition ${
+                    plans.length <= 1 ? "bg-zinc-950 text-zinc-500 ring-zinc-800" : "bg-zinc-950 ring-zinc-800 hover:bg-zinc-800"
+                  }`}
+                  title={plans.length <= 1 ? "You must keep at least one plan" : "Delete plan"}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </button>
+              </div>
+
+              <button
+                onClick={() => updateActivePlan({ tool: "paint" })}
+                className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-sm shadow-sm transition ${
+                  activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950" : "bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                }`}
+                title="Paint tool"
+              >
+                <Paintbrush className="h-4 w-4" />
+                Paint
+              </button>
+
+              <button
+                onClick={() => updateActivePlan({ tool: "erase" })}
+                className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-sm shadow-sm transition ${
+                  activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950" : "bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                }`}
+                title="Eraser tool"
+              >
+                <Eraser className="h-4 w-4" />
+                Erase
+              </button>
+
+              <button
+                onClick={openExport}
+                className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm shadow-sm transition hover:bg-zinc-800"
+                title="Export / Import"
+              >
+                <Download className="h-4 w-4" />
+                Export / Import
+              </button>
+
+              <div className="flex items-center gap-1 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
+                <span className="px-2 text-zinc-300">View</span>
+                {([
+                  { k: "5", label: "5m" },
+                  { k: "15", label: "15m" },
+                  { k: "60", label: "1h" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.k}
+                    onClick={() => setTimeScale(opt.k)}
+                    className={`rounded-xl px-2 py-1 text-xs ring-1 transition ${
+                      timeScale === opt.k
+                        ? "bg-zinc-100 text-zinc-950 ring-zinc-200"
+                        : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
+                    }`}
+                    title={`Show ${opt.label} blocks`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <main className="rounded-3xl bg-zinc-900/60 p-3 shadow-sm ring-1 ring-zinc-800">
             <div className="overflow-auto rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
               <div className="min-w-[980px]">
@@ -1359,9 +1359,9 @@ export default function App() {
               </div>
             ) : null}
           </main>
-        </div>
 
-        <footer className="mt-4 text-xs text-zinc-500">Stored locally in your browser via localStorage. No server required.</footer>
+          <footer className="mt-4 text-center text-xs text-zinc-500">Stored locally in your browser via localStorage. No server required.</footer>
+        </div>
       </div>
 
       {planModalOpen ? (
