@@ -1220,7 +1220,9 @@ export default function App() {
                   return (
                     <div key={visIndex} className="grid grid-cols-[84px_repeat(7,1fr)]">
                       <div
-                        className={`flex items-center border-b border-zinc-900 px-3 text-[11px] ${showLabel ? "text-zinc-300" : "text-zinc-600"}`}
+                        className={`flex items-center border-b border-zinc-900 px-3 text-[11px] ${
+                          showLabel ? "text-zinc-300" : "text-zinc-600"
+                        } ${startRow % 12 === 0 ? "border-t-zinc-700 border-t" : ""}`}
                         style={{ height: rowHeight }}
                       >
                         {showLabel ? time : ""}
@@ -1241,7 +1243,7 @@ export default function App() {
                               onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
                               onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
                               className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 px-1 ${
-                                isHour ? "border-b-zinc-700" : isQuarterHour ? "border-b-zinc-800" : ""
+                                isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-b-zinc-800" : ""
                               }`}
                               style={{
                                 height: rowHeight,
@@ -1266,7 +1268,7 @@ export default function App() {
                               onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
                               onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
                               className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 ${
-                                isHour ? "border-b-zinc-700" : isQuarterHour ? "border-b-zinc-800" : ""
+                                isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-b-zinc-800" : ""
                               }`}
                               style={{ height: rowHeight, backgroundImage: cellInfo.gradient }}
                               title={`${DAYS[dayIndex]} ${timeRange}\n${cellInfo.tip}`}
@@ -1281,7 +1283,7 @@ export default function App() {
                             onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
                             onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
                             className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 ${
-                              isHour ? "border-b-zinc-700" : isQuarterHour ? "border-b-zinc-800" : ""
+                              isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-b-zinc-800" : ""
                             }`}
                             style={{ height: rowHeight, background: "transparent" }}
                             title={`${DAYS[dayIndex]} ${timeRange}`}
