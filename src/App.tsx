@@ -102,6 +102,16 @@ function timeLabelForRow(rowIndex: number) {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
+function timeRangeLabel(startRow: number, numRows: number) {
+  const startMins = startRow * 5;
+  const endMins = (startRow + numRows) * 5;
+  const startHH = Math.floor(startMins / 60);
+  const startMM = startMins % 60;
+  const endHH = Math.floor(endMins / 60);
+  const endMM = endMins % 60;
+  return `${String(startHH).padStart(2, "0")}:${String(startMM).padStart(2, "0")}-${String(endHH).padStart(2, "0")}:${String(endMM).padStart(2, "0")}`;
+}
+
 function buildEmptyWeek() {
   return Array.from({ length: 7 }, () => Array.from({ length: 288 }, () => null as string | null));
 }
@@ -209,6 +219,9 @@ function runSelfTests() {
   console.assert(timeLabelForRow(0) === "00:00", "Row 0 should label 00:00");
   console.assert(timeLabelForRow(12) === "01:00", "Row 12 should label 01:00");
   console.assert(timeLabelForRow(287) === "23:55", "Row 287 should label 23:55");
+  console.assert(timeRangeLabel(0, 1) === "00:00-00:05", "5-minute range should format correctly");
+  console.assert(timeRangeLabel(0, 3) === "00:00-00:15", "15-minute range should format correctly");
+  console.assert(timeRangeLabel(0, 12) === "00:00-01:00", "1-hour range should format correctly");
   console.assert(formatMinutes(65) === "1h 05m", "65 minutes formats as 1h 05m");
   console.assert(hexWithAlpha("#000000", 0.5) === "rgba(0, 0, 0, 0.5)", "hexWithAlpha should convert correctly");
 
@@ -1201,6 +1214,7 @@ export default function App() {
                   const startRow = visIndex * viewStep;
                   const showLabel = startRow % 12 === 0;
                   const time = timeLabelForRow(startRow);
+                  const timeRange = timeRangeLabel(startRow, viewStep);
                   const rowHeight = viewStep === 1 ? 16 : viewStep === 3 ? 18 : 32;
 
                   return (
@@ -1233,7 +1247,7 @@ export default function App() {
                                 height: rowHeight,
                                 background: a ? hexWithAlpha(a.colour, 0.22) : "transparent",
                               }}
-                              title={a ? `${a.name} (${DAYS[dayIndex]} ${time})` : `${DAYS[dayIndex]} ${time}`}
+                              title={a ? `${a.name} (${DAYS[dayIndex]} ${timeRange})` : `${DAYS[dayIndex]} ${timeRange}`}
                             >
                               {a && isQuarterHour && Icon ? (
                                 <div className="absolute inset-y-0 left-1 flex items-center">
@@ -1255,7 +1269,7 @@ export default function App() {
                                 isHour ? "border-b-zinc-700" : isQuarterHour ? "border-b-zinc-800" : ""
                               }`}
                               style={{ height: rowHeight, backgroundImage: cellInfo.gradient }}
-                              title={`${DAYS[dayIndex]} ${time}\n${cellInfo.tip}`}
+                              title={`${DAYS[dayIndex]} ${timeRange}\n${cellInfo.tip}`}
                             />
                           );
                         }
@@ -1270,7 +1284,7 @@ export default function App() {
                               isHour ? "border-b-zinc-700" : isQuarterHour ? "border-b-zinc-800" : ""
                             }`}
                             style={{ height: rowHeight, background: "transparent" }}
-                            title={`${DAYS[dayIndex]} ${time}`}
+                            title={`${DAYS[dayIndex]} ${timeRange}`}
                           />
                         );
                       })}
