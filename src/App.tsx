@@ -1201,7 +1201,7 @@ export default function App() {
                   const startRow = visIndex * viewStep;
                   const showLabel = startRow % 12 === 0;
                   const time = timeLabelForRow(startRow);
-                  const rowHeight = viewStep === 1 ? 16 : 18;
+                  const rowHeight = viewStep === 1 ? 16 : viewStep === 3 ? 18 : 32;
 
                   return (
                     <div key={visIndex} className="grid grid-cols-[84px_repeat(7,1fr)]">
