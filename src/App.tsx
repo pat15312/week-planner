@@ -1206,7 +1206,7 @@ export default function App() {
                   return (
                     <div key={visIndex} className="grid grid-cols-[84px_repeat(7,1fr)]">
                       <div
-                        className={`border-b border-zinc-900 px-3 py-1 text-[11px] ${showLabel ? "text-zinc-300" : "text-zinc-600"}`}
+                        className={`flex items-center border-b border-zinc-900 px-3 text-[11px] ${showLabel ? "text-zinc-300" : "text-zinc-600"}`}
                         style={{ height: rowHeight }}
                       >
                         {showLabel ? time : ""}
