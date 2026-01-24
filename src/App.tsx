@@ -808,10 +808,10 @@ export default function App() {
       : "Delete plan";
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="mx-auto flex max-w-[1400px] gap-4 p-4">
-        <aside className="w-[360px] shrink-0 rounded-3xl bg-zinc-900/60 p-4 shadow-sm ring-1 ring-zinc-800">
-          <div className="mb-4 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
+    <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
+      <div className="mx-auto flex h-full max-w-[1400px] gap-4 p-4">
+        <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-4 shadow-sm ring-1 ring-zinc-800">
+          <div className="mb-4 shrink-0 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
             <div className="flex items-center justify-between">
               <span className="text-zinc-300">Free time</span>
               <span className="rounded-xl bg-zinc-900 px-2 py-1 text-sm ring-1 ring-zinc-800">
@@ -820,7 +820,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex shrink-0 items-center justify-between">
             <div>
               <div className="text-lg font-semibold">Activities</div>
             </div>
@@ -833,7 +833,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="space-y-2">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
               {activePlan.activities.map((a) => {
                 const Icon = getIconComponent(a.icon);
                 const selected = a.id === activePlan.selectedActivityId;
@@ -1087,8 +1087,8 @@ export default function App() {
             </div>
           </aside>
 
-        <div className="flex flex-1 flex-col">
-          <div className="mb-6 flex flex-col items-center text-center">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="mb-4 flex shrink-0 flex-col items-center text-center">
             <div>
               <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
               <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
@@ -1198,8 +1198,8 @@ export default function App() {
             </div>
           </div>
 
-          <main className="rounded-3xl bg-zinc-900/60 p-3 shadow-sm ring-1 ring-zinc-800">
-            <div className="overflow-auto rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
+          <main className="min-h-0 flex-1 overflow-hidden rounded-3xl bg-zinc-900/60 p-3 shadow-sm ring-1 ring-zinc-800">
+            <div className="h-full overflow-auto rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
               <div className="min-w-[980px]">
                 <div className="sticky top-0 z-10 grid grid-cols-[84px_repeat(7,1fr)] bg-zinc-950/95 backdrop-blur">
                   <div className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
@@ -1360,7 +1360,7 @@ export default function App() {
             ) : null}
           </main>
 
-          <footer className="mt-4 text-center text-xs text-zinc-500">Stored locally in your browser via localStorage. No server required.</footer>
+          <footer className="mt-3 shrink-0 text-center text-xs text-zinc-500">Stored locally in your browser via localStorage. No server required.</footer>
         </div>
       </div>
 
