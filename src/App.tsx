@@ -1199,12 +1199,12 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
-              <div>
+            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
+              <div className="h-full overflow-auto">
                 <div className="sticky top-0 z-10 grid grid-cols-[84px_repeat(7,1fr)] bg-zinc-950/95 backdrop-blur">
-                  <div className="rounded-tl-2xl border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
-                  {DAYS.map((d, idx) => (
-                    <div key={d} className={`border-b border-l border-zinc-800 px-3 py-2 ${idx === 6 ? 'rounded-tr-2xl' : ''}`}>
+                  <div className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
+                  {DAYS.map((d) => (
+                    <div key={d} className="border-b border-l border-zinc-800 px-3 py-2">
                       <div className="text-sm font-medium">{d}</div>
                     </div>
                   ))}
