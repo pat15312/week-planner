@@ -1201,7 +1201,7 @@ export default function App() {
             </div>
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
               <div className="h-full overflow-auto">
-                <div className="sticky top-0 z-10 grid grid-cols-[84px_repeat(7,1fr)] bg-zinc-950/95 backdrop-blur">
+                <div className="sticky top-0 z-10 grid grid-cols-[84px_repeat(7,1fr)] overflow-hidden rounded-t-2xl bg-zinc-950/95 backdrop-blur">
                   <div className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
                   {DAYS.map((d) => (
                     <div key={d} className="border-b border-l border-zinc-800 px-3 py-2">
