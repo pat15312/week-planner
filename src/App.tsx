@@ -1100,7 +1100,7 @@ export default function App() {
                 <select
                   value={activePlan.id}
                   onChange={(e) => setActivePlanId(e.target.value)}
-                  className="rounded-xl bg-zinc-950 px-2 py-1 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
+                  className="h-8 rounded-xl bg-zinc-950 px-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
                 >
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
