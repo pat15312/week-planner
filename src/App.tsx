@@ -1093,8 +1093,8 @@ export default function App() {
             <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
           </div>
 
-          <main className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-3 ring-1 ring-zinc-800">
-            <div className="mb-3 flex items-center justify-between rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
+            <div className="mb-3 ml-1 mr-1 mt-1 flex items-center justify-between rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
               <div className="flex items-center gap-2">
                 <span className="text-zinc-300">Plan</span>
                 <select
@@ -1197,7 +1197,7 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
+            <div className="mb-1 ml-1 mr-1 min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
               <div className="h-full overflow-auto">
                 <div className="sticky top-0 z-10 grid grid-cols-[84px_repeat(7,1fr)] overflow-hidden rounded-t-2xl bg-zinc-950/95 backdrop-blur">
                   <div className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
