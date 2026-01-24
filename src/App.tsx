@@ -810,7 +810,7 @@ export default function App() {
   return (
     <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex h-full max-w-[1400px] gap-4 p-4">
-        <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
+        <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-4 ring-1 ring-zinc-800">
           <div className="mb-4 shrink-0 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
             <div className="flex items-center justify-between">
               <span className="text-zinc-300">Free time</span>
