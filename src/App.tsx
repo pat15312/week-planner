@@ -1141,6 +1141,14 @@ export default function App() {
                   <Trash2 className="h-3 w-3" />
                   Delete
                 </button>
+                <button
+                  onClick={openExport}
+                  className="flex items-center gap-1 rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 transition hover:bg-zinc-800"
+                  title="Export / Import"
+                >
+                  <Download className="h-3 w-3" />
+                  Export
+                </button>
               </div>
 
               <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
@@ -1166,15 +1174,6 @@ export default function App() {
                   Erase
                 </button>
               </div>
-
-              <button
-                onClick={openExport}
-                className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800 transition hover:bg-zinc-800"
-                title="Export / Import"
-              >
-                <Download className="h-4 w-4" />
-                Export / Import
-              </button>
 
               <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
                 <span className="px-1 text-zinc-300">View</span>
