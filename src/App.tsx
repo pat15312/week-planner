@@ -810,7 +810,7 @@ export default function App() {
   return (
     <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex h-full max-w-[1400px] gap-4 p-4">
-        <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-4 shadow-sm ring-1 ring-zinc-800">
+        <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-4 ring-1 ring-zinc-800">
           <div className="mb-4 shrink-0 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
             <div className="flex items-center justify-between">
               <span className="text-zinc-300">Free time</span>
@@ -826,7 +826,7 @@ export default function App() {
             </div>
             <button
               onClick={addActivity}
-              className="flex items-center gap-2 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 shadow-sm transition hover:opacity-90"
+              className="flex items-center gap-2 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 ring-1 ring-zinc-200 transition hover:opacity-90"
             >
               <Plus className="h-4 w-4" />
               Add
@@ -1200,7 +1200,7 @@ export default function App() {
             </div>
           </div>
 
-          <main className="min-h-0 flex-1 overflow-hidden rounded-3xl bg-zinc-900/60 p-3 shadow-sm ring-1 ring-zinc-800">
+          <main className="min-h-0 flex-1 overflow-hidden rounded-3xl bg-zinc-900/60 p-3 ring-1 ring-zinc-800">
             <div className="h-full overflow-auto rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
               <div className="min-w-[980px]">
                 <div className="sticky top-0 z-10 grid grid-cols-[84px_repeat(7,1fr)] bg-zinc-950/95 backdrop-blur">
