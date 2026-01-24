@@ -1241,7 +1241,7 @@ export default function App() {
                               onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
                               onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
                               className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 px-1 ${
-                                isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-b-zinc-800" : ""
+                                isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                               }`}
                               style={{
                                 height: rowHeight,
@@ -1266,7 +1266,7 @@ export default function App() {
                               onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
                               onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
                               className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 ${
-                                isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-b-zinc-800" : ""
+                                isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                               }`}
                               style={{ height: rowHeight, backgroundImage: cellInfo.gradient }}
                               title={`${DAYS[dayIndex]} ${timeRange}\n${cellInfo.tip}`}
@@ -1281,7 +1281,7 @@ export default function App() {
                             onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
                             onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
                             className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 ${
-                              isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-b-zinc-800" : ""
+                              isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                             }`}
                             style={{ height: rowHeight, background: "transparent" }}
                             title={`${DAYS[dayIndex]} ${timeRange}`}
