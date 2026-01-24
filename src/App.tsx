@@ -810,8 +810,8 @@ export default function App() {
   return (
     <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex h-full max-w-[1400px] gap-4 p-4">
-        <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 pl-4 pr-2 py-4 ring-1 ring-zinc-800">
-          <div className="mb-4 ml-2 mr-2 shrink-0 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
+        <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
+          <div className="mb-4 shrink-0 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
             <div className="flex items-center justify-between">
               <span className="text-zinc-300">Free time</span>
               <span className="rounded-xl bg-zinc-900 px-2 py-1 text-sm ring-1 ring-zinc-800">
@@ -820,7 +820,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="mb-3 ml-2 mr-2 flex shrink-0 items-center justify-between">
+          <div className="mb-3 flex shrink-0 items-center justify-between">
             <div>
               <div className="text-lg font-semibold">Activities</div>
             </div>
@@ -833,7 +833,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pl-2 pr-2 pt-1">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pt-1">
               {activePlan.activities.map((a) => {
                 const Icon = getIconComponent(a.icon);
                 const selected = a.id === activePlan.selectedActivityId;
