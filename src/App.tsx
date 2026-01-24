@@ -1094,7 +1094,7 @@ export default function App() {
           </div>
 
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-3 ring-1 ring-zinc-800">
-            <div className="mb-3 flex items-center justify-between px-2">
+            <div className="mb-3 flex items-center gap-3 px-2">
               <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
                 <span className="text-zinc-300">Plan</span>
                 <select
@@ -1151,52 +1151,50 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
-                  <button
-                    onClick={() => updateActivePlan({ tool: "paint" })}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
-                      activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
-                    }`}
-                    title="Paint tool"
-                  >
-                    <Paintbrush className="h-4 w-4" />
-                    Paint
-                  </button>
+              <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
+                <button
+                  onClick={() => updateActivePlan({ tool: "paint" })}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
+                    activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
+                  }`}
+                  title="Paint tool"
+                >
+                  <Paintbrush className="h-4 w-4" />
+                  Paint
+                </button>
 
-                  <button
-                    onClick={() => updateActivePlan({ tool: "erase" })}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
-                      activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
-                    }`}
-                    title="Eraser tool"
-                  >
-                    <Eraser className="h-4 w-4" />
-                    Erase
-                  </button>
-                </div>
+                <button
+                  onClick={() => updateActivePlan({ tool: "erase" })}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
+                    activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
+                  }`}
+                  title="Eraser tool"
+                >
+                  <Eraser className="h-4 w-4" />
+                  Erase
+                </button>
+              </div>
 
-                <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
-                  <span className="px-1 text-zinc-300">View</span>
-                  {([
-                    { k: "5", label: "5m" },
-                    { k: "15", label: "15m" },
-                    { k: "60", label: "1h" },
-                  ] as const).map((opt) => (
-                    <button
-                      key={opt.k}
-                      onClick={() => setTimeScale(opt.k)}
-                      className={`w-16 rounded-xl py-1.5 text-sm ring-1 transition ${
-                        timeScale === opt.k
-                          ? "bg-zinc-100 text-zinc-950 ring-zinc-200"
-                          : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
-                      }`}
-                      title={`Show ${opt.label} blocks`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
+                <span className="px-1 text-zinc-300">View</span>
+                {([
+                  { k: "5", label: "5m" },
+                  { k: "15", label: "15m" },
+                  { k: "60", label: "1h" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.k}
+                    onClick={() => setTimeScale(opt.k)}
+                    className={`w-16 rounded-xl py-1.5 text-sm ring-1 transition ${
+                      timeScale === opt.k
+                        ? "bg-zinc-100 text-zinc-950 ring-zinc-200"
+                        : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
+                    }`}
+                    title={`Show ${opt.label} blocks`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
