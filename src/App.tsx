@@ -1094,7 +1094,7 @@ export default function App() {
               <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
               <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
                 <span className="text-zinc-300">Plan</span>
                 <select
@@ -1110,21 +1110,21 @@ export default function App() {
                 </select>
                 <button
                   onClick={() => openPlanModal("new")}
-                  className="rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
+                  className="rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 transition hover:bg-zinc-800"
                   title="New plan"
                 >
                   New
                 </button>
                 <button
                   onClick={() => openPlanModal("rename")}
-                  className="rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
+                  className="rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 transition hover:bg-zinc-800"
                   title="Rename plan"
                 >
                   Rename
                 </button>
                 <button
                   onClick={() => openPlanModal("duplicate")}
-                  className="flex items-center gap-1 rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 hover:bg-zinc-800"
+                  className="flex items-center gap-1 rounded-xl bg-zinc-950 px-2 py-1 text-xs ring-1 ring-zinc-800 transition hover:bg-zinc-800"
                   title="Duplicate plan"
                 >
                   <Copy className="h-3 w-3" />
@@ -1134,7 +1134,7 @@ export default function App() {
                   onClick={() => openPlanModal("delete")}
                   disabled={plans.length <= 1}
                   className={`flex items-center gap-1 rounded-xl px-2 py-1 text-xs ring-1 transition ${
-                    plans.length <= 1 ? "bg-zinc-950 text-zinc-500 ring-zinc-800" : "bg-zinc-950 ring-zinc-800 hover:bg-zinc-800"
+                    plans.length <= 1 ? "bg-zinc-950 text-zinc-500 ring-zinc-800" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
                   }`}
                   title={plans.length <= 1 ? "You must keep at least one plan" : "Delete plan"}
                 >
@@ -1143,39 +1143,41 @@ export default function App() {
                 </button>
               </div>
 
-              <button
-                onClick={() => updateActivePlan({ tool: "paint" })}
-                className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-sm shadow-sm transition ${
-                  activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950" : "bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
-                }`}
-                title="Paint tool"
-              >
-                <Paintbrush className="h-4 w-4" />
-                Paint
-              </button>
+              <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
+                <button
+                  onClick={() => updateActivePlan({ tool: "paint" })}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
+                    activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
+                  }`}
+                  title="Paint tool"
+                >
+                  <Paintbrush className="h-4 w-4" />
+                  Paint
+                </button>
 
-              <button
-                onClick={() => updateActivePlan({ tool: "erase" })}
-                className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-sm shadow-sm transition ${
-                  activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950" : "bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
-                }`}
-                title="Eraser tool"
-              >
-                <Eraser className="h-4 w-4" />
-                Erase
-              </button>
+                <button
+                  onClick={() => updateActivePlan({ tool: "erase" })}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
+                    activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
+                  }`}
+                  title="Eraser tool"
+                >
+                  <Eraser className="h-4 w-4" />
+                  Erase
+                </button>
+              </div>
 
               <button
                 onClick={openExport}
-                className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm shadow-sm transition hover:bg-zinc-800"
+                className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800 transition hover:bg-zinc-800"
                 title="Export / Import"
               >
                 <Download className="h-4 w-4" />
                 Export / Import
               </button>
 
-              <div className="flex items-center gap-1 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
-                <span className="px-2 text-zinc-300">View</span>
+              <div className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-2 py-2 text-sm ring-1 ring-zinc-800">
+                <span className="px-1 text-zinc-300">View</span>
                 {([
                   { k: "5", label: "5m" },
                   { k: "15", label: "15m" },
@@ -1184,7 +1186,7 @@ export default function App() {
                   <button
                     key={opt.k}
                     onClick={() => setTimeScale(opt.k)}
-                    className={`rounded-xl px-2 py-1 text-xs ring-1 transition ${
+                    className={`rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
                       timeScale === opt.k
                         ? "bg-zinc-100 text-zinc-950 ring-zinc-200"
                         : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
