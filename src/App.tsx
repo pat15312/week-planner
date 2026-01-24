@@ -811,7 +811,7 @@ export default function App() {
     <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex h-full max-w-[1400px] gap-4 p-4">
         <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
-          <div className="mx-2 mb-4 shrink-0 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
+          <div className="m-2 mb-4 shrink-0 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
             <div className="flex items-center justify-between">
               <span className="text-zinc-300">Free time</span>
               <span className="rounded-xl bg-zinc-900 px-2 py-1 text-sm ring-1 ring-zinc-800">
@@ -833,7 +833,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pt-1">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-1 pt-1">
               {activePlan.activities.map((a) => {
                 const Icon = getIconComponent(a.icon);
                 const selected = a.id === activePlan.selectedActivityId;
