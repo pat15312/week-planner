@@ -833,7 +833,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden">
               {activePlan.activities.map((a) => {
                 const Icon = getIconComponent(a.icon);
                 const selected = a.id === activePlan.selectedActivityId;
