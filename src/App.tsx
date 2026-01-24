@@ -1087,7 +1087,7 @@ export default function App() {
             </div>
           </aside>
 
-        <div className="flex min-w-[1100px] flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-[1100px] flex-1 flex-col overflow-hidden p-1">
           <div className="mb-3 flex shrink-0 flex-col items-center text-center">
             <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
             <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
