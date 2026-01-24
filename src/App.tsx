@@ -1087,7 +1087,7 @@ export default function App() {
             </div>
           </aside>
 
-        <div className="flex min-w-[1400px] flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-[1100px] flex-1 flex-col overflow-hidden">
           <div className="mb-4 flex shrink-0 flex-col items-center text-center">
             <div>
               <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
