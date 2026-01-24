@@ -973,7 +973,7 @@ export default function App() {
                             </button>
 
                             {openIconPickerFor === a.id ? (
-                              <div data-icon-picker-root className="absolute right-0 z-30 mt-2 w-full rounded-2xl bg-zinc-950 p-2 shadow-xl ring-1 ring-zinc-800">
+                              <div data-icon-picker-root className="absolute right-0 z-30 mt-2 w-full rounded-2xl bg-zinc-950 p-2 ring-1 ring-zinc-800">
                                 <div className="grid grid-cols-6 gap-2">
                                   {ICONS.map((i) => {
                                     const I = i.Icon;
@@ -1298,7 +1298,7 @@ export default function App() {
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={(e) => {
                 if (e.target === e.currentTarget) setImportExportOpen(false);
               }}>
-                <div className="w-full max-w-3xl rounded-3xl bg-zinc-950 p-4 shadow-xl ring-1 ring-zinc-800">
+                <div className="w-full max-w-3xl rounded-3xl bg-zinc-950 p-4 ring-1 ring-zinc-800">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
                       <div className="text-lg font-semibold">Export / Import</div>
@@ -1369,7 +1369,7 @@ export default function App() {
             if (e.target === e.currentTarget) setPlanModalOpen(false);
           }}
         >
-          <div className="w-full max-w-lg rounded-3xl bg-zinc-950 p-4 shadow-xl ring-1 ring-zinc-800">
+          <div className="w-full max-w-lg rounded-3xl bg-zinc-950 p-4 ring-1 ring-zinc-800">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold">{planModalTitle}</div>
@@ -1437,7 +1437,7 @@ export default function App() {
 
       {reorderOverlay ? (
         <div className="pointer-events-none fixed z-[60]" style={{ top: reorderOverlay.top, left: reorderOverlay.x, width: reorderOverlay.width }}>
-          <div className="rounded-2xl bg-zinc-950 ring-1 ring-zinc-700 shadow-2xl">
+          <div className="rounded-2xl bg-zinc-950 ring-1 ring-zinc-700">
             <div className="p-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 text-zinc-500">
