@@ -99,6 +99,30 @@ export function reorderByIndex<T>(list: T[], fromIndex: number, toIndex: number)
   return next;
 }
 
+export type PlannerState = {
+  plans: Plan[];
+  activePlanId: string | null;
+};
+
+export function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function initialisePlannerState(storedValue: unknown, defaultPlan: Plan): PlannerState {
+  if (isObjectRecord(storedValue) && Array.isArray(storedValue.plans) && storedValue.plans.length > 0) {
+    const plans = storedValue.plans as Plan[];
+    const storedActivePlanId = storedValue.activePlanId;
+    const activePlanId =
+      typeof storedActivePlanId === "string" && plans.some((plan) => plan.id === storedActivePlanId)
+        ? storedActivePlanId
+        : plans[0]?.id ?? null;
+
+    return { plans, activePlanId };
+  }
+
+  return { plans: [defaultPlan], activePlanId: defaultPlan.id };
+}
+
 export function makeDefaultPlan(name = "Default"): Plan {
   return {
     id: `p_${uid()}`,

@@ -5,6 +5,7 @@ import {
   formatMinutes,
   hexWithAlpha,
   iconLabel,
+  initialisePlannerState,
   reorderByIndex,
   safeParseJSON,
   timeLabelForRow,
@@ -74,5 +75,56 @@ describe("planner helpers", () => {
     expect(iconLabel("briefcase")).toBe("Briefcase");
     expect(iconLabel("gamepad2")).toBe("Gamepad 2");
     expect(iconLabel("book_open")).toBe("Book Open");
+  });
+});
+
+
+describe("planner storage initialisation", () => {
+  const makePlan = (id: string) => ({
+    id,
+    name: id,
+    activities: [],
+    grid: buildEmptyWeek(),
+    selectedActivityId: null,
+    tool: "paint" as const,
+  });
+
+  it("restores a valid active plan that is not the first stored plan", () => {
+    const first = makePlan("first-plan");
+    const second = makePlan("second-plan");
+
+    const state = initialisePlannerState({ version: 3, activePlanId: second.id, plans: [first, second] }, makePlan("default-plan"));
+
+    expect(state.plans).toEqual([first, second]);
+    expect(state.activePlanId).toBe(second.id);
+  });
+
+  it("falls back to the first stored plan when activePlanId is missing", () => {
+    const first = makePlan("first-plan");
+    const second = makePlan("second-plan");
+
+    const state = initialisePlannerState({ version: 3, plans: [first, second] }, makePlan("default-plan"));
+
+    expect(state.plans).toEqual([first, second]);
+    expect(state.activePlanId).toBe(first.id);
+  });
+
+  it("falls back to the first stored plan when activePlanId does not match an existing plan", () => {
+    const first = makePlan("first-plan");
+    const second = makePlan("second-plan");
+
+    const state = initialisePlannerState({ version: 3, activePlanId: "missing-plan", plans: [first, second] }, makePlan("default-plan"));
+
+    expect(state.plans).toEqual([first, second]);
+    expect(state.activePlanId).toBe(first.id);
+  });
+
+  it("creates and selects the default plan when stored data is absent or malformed", () => {
+    const defaultPlan = makePlan("default-plan");
+
+    expect(initialisePlannerState(null, defaultPlan)).toEqual({ plans: [defaultPlan], activePlanId: defaultPlan.id });
+    expect(initialisePlannerState("not an object", defaultPlan)).toEqual({ plans: [defaultPlan], activePlanId: defaultPlan.id });
+    expect(initialisePlannerState({ version: 3, plans: [] }, defaultPlan)).toEqual({ plans: [defaultPlan], activePlanId: defaultPlan.id });
+    expect(initialisePlannerState({ version: 3, plans: "bad" }, defaultPlan)).toEqual({ plans: [defaultPlan], activePlanId: defaultPlan.id });
   });
 });
