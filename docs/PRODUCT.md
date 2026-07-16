@@ -136,7 +136,10 @@ The sum of allocated and free time always represents the full 168-hour week when
 
 - save plans automatically in the current browser
 - export all plans as JSON
-- import a JSON set of plans
+- import a valid version 3 JSON set of plans
+- reject invalid imports without replacing current plans
+- restore the previous plans after a successful import when the pre-import backup is available
+- recover from unusable browser-stored data by saving the original text, importing a valid replacement or explicitly resetting
 
 ## Current experience
 

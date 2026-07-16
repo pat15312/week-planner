@@ -35,10 +35,8 @@ import {
   formatMinutes,
   hexWithAlpha,
   iconLabel,
-  initialisePlannerState,
   makeDefaultPlan,
   reorderByIndex,
-  safeParseJSON,
   timeLabelForRow,
   timeRangeLabel,
   uid,
@@ -46,6 +44,18 @@ import {
   type Plan,
   type ToolMode,
 } from "./domain/planner";
+import {
+  PRE_IMPORT_BACKUP_KEY,
+  STORAGE_KEY,
+  applyRecoveryReplacement,
+  applyValidatedImport,
+  createPlannerPayload,
+  loadStartupState,
+  parsePlannerPayloadJSON,
+  resetAfterRecovery,
+  restoreBackup,
+  savePayload,
+} from "./domain/persistence";
 
 // Weekly 5-minute Planner v3
 // - Multiple saved plans (localStorage)
@@ -58,8 +68,6 @@ import {
 // - Activity customisation (name, colour, icon)
 // - Pointer-based drag-to-reorder activities
 // - Right click ALWAYS erases
-
-const STORAGE_KEY = "week_planner_5min_store_v3";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -115,13 +123,16 @@ function getIconComponent(iconKey: string) {
 type PlanModalMode = "new" | "rename" | "duplicate" | "delete";
 
 export default function App() {
-  const [{ plans, activePlanId }, setPlannerState] = useState(() => {
-    const defaultPlan = makeDefaultPlan("Default");
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? safeParseJSON(raw) : null;
-
-    return initialisePlannerState(parsed?.ok ? parsed.value : null, defaultPlan);
-  });
+  const [startup] = useState(() => loadStartupState(localStorage, makeDefaultPlan("Default")));
+  const [startupRecovery, setStartupRecovery] = useState<{ originalText: string; error: string } | null>(
+    startup.status === "recovery" ? { originalText: startup.originalText, error: startup.error } : null
+  );
+  const [storageWarning, setStorageWarning] = useState<string | null>(startup.warning);
+  const [autoPersistenceEnabled, setAutoPersistenceEnabled] = useState(startup.autoPersistenceEnabled);
+  const [canRestorePreviousPlans, setCanRestorePreviousPlans] = useState(false);
+  const [resetConfirmation, setResetConfirmation] = useState(false);
+  const [recoveryStatus, setRecoveryStatus] = useState<{ type: "ok" | "error"; message: string } | null>(null);
+  const [{ plans, activePlanId }, setPlannerState] = useState(startup.state);
 
   const setPlans: React.Dispatch<React.SetStateAction<Plan[]>> = (value) => {
     setPlannerState((prev) => ({
@@ -183,14 +194,22 @@ export default function App() {
 
   // Persist to storage
   useEffect(() => {
-    if (!plans || plans.length === 0) return;
-    const payload = {
-      version: 3,
-      activePlanId: activePlanId ?? plans[0]?.id ?? null,
-      plans,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [plans, activePlanId]);
+    if (!plans || plans.length === 0 || startupRecovery || !autoPersistenceEnabled) return;
+    const saved = savePayload(localStorage, STORAGE_KEY, createPlannerPayload(plans, activePlanId));
+    setStorageWarning(saved.ok ? null : "Changes are not being saved because browser storage is unavailable. Export your plans to keep a copy.");
+  }, [plans, activePlanId, startupRecovery, autoPersistenceEnabled]);
+
+  useEffect(() => {
+    try {
+      const rawBackup = localStorage.getItem(PRE_IMPORT_BACKUP_KEY);
+      setCanRestorePreviousPlans(rawBackup !== null && parsePlannerPayloadJSON(rawBackup).ok);
+    } catch {
+      const message = "Browser storage could not be read. Changes may not be saved.";
+      setCanRestorePreviousPlans(false);
+      if (startupRecovery) setRecoveryStatus({ type: "error", message });
+      else setStorageWarning(message);
+    }
+  }, [importExportOpen, startupRecovery]);
 
   // Keep activePlanId valid
   useEffect(() => {
@@ -315,7 +334,7 @@ export default function App() {
   function onCellPointerDown(e: React.MouseEvent, dayIndex: number, startRow: number) {
     e.preventDefault();
 
-    const buttons = typeof (e as any).buttons === "number" ? (e as any).buttons : 0;
+    const buttons = e.buttons;
     const isRightClick = e.button === 2 || (buttons & 2) === 2;
 
     isMouseDownRef.current = true;
@@ -414,50 +433,94 @@ export default function App() {
   }
 
   function openExport() {
-    const payload = { version: 3, activePlanId: activePlan.id, plans };
-    setJsonBuffer(JSON.stringify(payload, null, 2));
+    setJsonBuffer(JSON.stringify(createPlannerPayload(plans, activePlan.id), null, 2));
     setJsonStatus(null);
     setImportExportOpen(true);
   }
 
+  function openRecoveryImport() {
+    setJsonBuffer("");
+    setJsonStatus(null);
+    setRecoveryStatus(null);
+    setImportExportOpen(true);
+  }
+
   function applyImport() {
-    const parsed = safeParseJSON(jsonBuffer);
-    if (!parsed.ok) {
-      setJsonStatus({ type: "error", message: parsed.error });
+    if (startupRecovery) {
+      const replacement = applyRecoveryReplacement(localStorage, jsonBuffer);
+      if (!replacement.ok) {
+        setJsonStatus({ type: "error", message: replacement.error.message });
+        return;
+      }
+      setPlannerState({ plans: replacement.value.plans, activePlanId: replacement.value.activePlanId });
+      setStartupRecovery(null);
+      setAutoPersistenceEnabled(true);
+      setResetConfirmation(false);
+      setRecoveryStatus(null);
+      setStorageWarning(null);
+      setJsonStatus({ type: "ok", message: "Replacement plans imported successfully." });
       return;
     }
 
-    const v: any = parsed.value;
-    if (!v || typeof v !== "object") {
-      setJsonStatus({ type: "error", message: "JSON must be an object." });
+    const currentPayload = createPlannerPayload(plans, activePlanId);
+    const imported = applyValidatedImport(localStorage, currentPayload, jsonBuffer);
+    if (!imported.ok) {
+      setJsonStatus({ type: "error", message: imported.error.message });
       return;
     }
 
-    if (!Array.isArray(v.plans) || v.plans.length === 0) {
-      setJsonStatus({ type: "error", message: "JSON must include a non-empty 'plans' array." });
+    setPlannerState({ plans: imported.value.plans, activePlanId: imported.value.activePlanId });
+    setStartupRecovery(null);
+    setAutoPersistenceEnabled(true);
+    setResetConfirmation(false);
+    setCanRestorePreviousPlans(true);
+    setStorageWarning(null);
+    setJsonStatus({ type: "ok", message: "Imported successfully. A pre-import backup was saved." });
+  }
+
+  function restorePreviousPlans() {
+    setRecoveryStatus(null);
+    const restored = restoreBackup(localStorage);
+    if (!restored.ok) {
+      if (startupRecovery) setRecoveryStatus({ type: "error", message: restored.error.message });
+      else setJsonStatus({ type: "error", message: restored.error.message });
       return;
     }
+    setPlannerState({ plans: restored.value.plans, activePlanId: restored.value.activePlanId });
+    setStartupRecovery(null);
+    setAutoPersistenceEnabled(true);
+    setCanRestorePreviousPlans(false);
+    setRecoveryStatus(null);
+    setStorageWarning(null);
+    setJsonStatus({ type: "ok", message: "Previous plans restored." });
+    setJsonBuffer(JSON.stringify(restored.value, null, 2));
+  }
 
-    const ok = v.plans.every(
-      (p: any) =>
-        p &&
-        typeof p === "object" &&
-        typeof p.id === "string" &&
-        typeof p.name === "string" &&
-        Array.isArray(p.activities) &&
-        Array.isArray(p.grid) &&
-        p.grid.length === 7 &&
-        p.grid.every((col: any) => Array.isArray(col) && col.length === 288)
-    );
+  function downloadRecoveredStorage() {
+    if (!startupRecovery) return;
+    const blob = new Blob([startupRecovery.originalText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "week-planner-invalid-storage.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
-    if (!ok) {
-      setJsonStatus({ type: "error", message: "One or more plans are invalid. Expected 7x288 grid per plan." });
+  function resetFromRecovery() {
+    const defaultPlan = makeDefaultPlan("Default");
+    const payload = createPlannerPayload([defaultPlan], defaultPlan.id);
+    const reset = resetAfterRecovery(localStorage, payload);
+    if (!reset.ok) {
+      setRecoveryStatus({ type: "error", message: "Week Planner could not reset because browser storage could not be written." });
       return;
     }
-
-    setPlans(v.plans);
-    setActivePlanId(typeof v.activePlanId === "string" ? v.activePlanId : v.plans[0].id);
-    setJsonStatus({ type: "ok", message: "Imported successfully." });
+    setPlannerState({ plans: payload.plans, activePlanId: payload.activePlanId });
+    setStartupRecovery(null);
+    setAutoPersistenceEnabled(true);
+    setResetConfirmation(false);
+    setRecoveryStatus(null);
+    setStorageWarning(null);
   }
 
   function openPlanModal(mode: PlanModalMode) {
@@ -662,6 +725,103 @@ export default function App() {
       : planModalMode === "duplicate"
       ? "Duplicate plan"
       : "Delete plan";
+
+  if (startupRecovery) {
+    return (
+      <div className="min-h-screen bg-zinc-950 p-6 text-zinc-100">
+        <div className="mx-auto max-w-3xl rounded-3xl bg-zinc-900/60 p-5 ring-1 ring-rose-900/60">
+          <div className="mb-3 text-2xl font-semibold">Week Planner needs your help to recover saved data</div>
+          <p className="mb-3 text-sm text-zinc-300">
+            The saved browser data could not be used, so Week Planner has not started normal editing and has not overwritten the original stored
+            value.
+          </p>
+          <div className="mb-4 rounded-2xl bg-zinc-950 p-3 text-sm text-rose-100 ring-1 ring-rose-900/60">{startupRecovery.error}</div>
+          {recoveryStatus ? (
+            <div
+              className={`mb-4 rounded-2xl bg-zinc-950 p-3 text-sm ring-1 ${
+                recoveryStatus.type === "ok" ? "text-zinc-100 ring-zinc-700" : "text-rose-100 ring-rose-900/60"
+              }`}
+            >
+              {recoveryStatus.message}
+            </div>
+          ) : null}
+
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                setRecoveryStatus(null);
+                downloadRecoveredStorage();
+              }}
+              className="rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 hover:opacity-90"
+            >
+              Download original stored text
+            </button>
+            <button onClick={openRecoveryImport} className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800">
+              Supply replacement JSON
+            </button>
+            {canRestorePreviousPlans ? (
+              <button onClick={restorePreviousPlans} className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800">
+                Restore previous plans
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-5 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
+            <div className="mb-2 font-medium">Reset Week Planner</div>
+            <p className="mb-3 text-sm text-zinc-400">Resetting replaces the invalid stored value with a new default plan. This is destructive.</p>
+            {resetConfirmation ? (
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setResetConfirmation(false)} className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800">
+                  Cancel
+                </button>
+                <button onClick={resetFromRecovery} className="rounded-2xl bg-rose-200 px-3 py-2 text-sm text-rose-950 hover:opacity-90">
+                  Confirm reset
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setRecoveryStatus(null);
+                  setResetConfirmation(true);
+                }}
+                className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800"
+              >
+                I understand, reset Week Planner
+              </button>
+            )}
+          </div>
+        </div>
+
+        {importExportOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-3xl rounded-3xl bg-zinc-950 p-4 ring-1 ring-zinc-800">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-lg font-semibold">Import replacement JSON</div>
+                  <div className="text-xs text-zinc-400">Paste a valid version 3 Week Planner export to replace the unusable stored data.</div>
+                </div>
+                <button onClick={() => setImportExportOpen(false)} className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800">
+                  Close
+                </button>
+              </div>
+              <textarea
+                value={jsonBuffer}
+                onChange={(e) => setJsonBuffer(e.target.value)}
+                className="h-[360px] w-full rounded-2xl bg-zinc-900 p-3 font-mono text-xs text-zinc-100 outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
+                spellCheck={false}
+              />
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <div className="text-xs text-rose-200">{jsonStatus?.message}</div>
+                <button onClick={applyImport} className="rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 hover:opacity-90">
+                  Import replacement
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
@@ -948,6 +1108,11 @@ export default function App() {
             <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
             <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
           </div>
+          {storageWarning ? (
+            <div className="mb-3 rounded-2xl bg-amber-950/60 px-3 py-2 text-sm text-amber-100 ring-1 ring-amber-800">
+              {storageWarning}
+            </div>
+          ) : null}
 
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
             <div className="mb-3 ml-1 mr-1 mt-1 flex items-center justify-between rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
@@ -1188,6 +1353,15 @@ export default function App() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      {canRestorePreviousPlans ? (
+                        <button
+                          onClick={restorePreviousPlans}
+                          className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800"
+                          title="Restore previous plans"
+                        >
+                          Restore previous plans
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => {
                           navigator.clipboard?.writeText(jsonBuffer);

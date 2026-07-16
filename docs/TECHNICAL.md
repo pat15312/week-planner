@@ -23,9 +23,11 @@ The application is a client-side React application with no current backend.
 
 - `index.html` provides the root element and page metadata.
 - `src/main.tsx` creates the React root in `StrictMode`.
-- `src/App.tsx` contains the React state, storage handling, interactions and most of the rendered interface.
+- `src/App.tsx` contains the React state, interactions and most of the rendered interface.
 - `src/domain/planner.ts` contains shared planner types and extracted pure helper logic.
+- `src/domain/persistence.ts` contains version 3 payload validation, storage keys and pure persistence safety operations.
 - `src/domain/planner.test.ts` contains Vitest unit tests for the extracted planner helpers.
+- `src/domain/persistence.test.ts` contains Vitest unit tests for validation, import, backup, recovery and storage failure behaviour.
 - `src/index.css` imports Tailwind and globally hides scrollbars.
 - `vite.config.ts` configures React and the `/week-planner/` base path.
 
@@ -54,11 +56,10 @@ The baseline review on 16 July 2026 verified:
 - dependency installation succeeds with `npm ci`
 - `npm run build` succeeds
 - the production output serves successfully at `/week-planner/`
-- `npm run lint` runs but fails with seven errors
+- `npm run lint` passes after the data-safety change removed the remaining explicit `any` usage
 
 The review used Node.js `24.14.0` and npm `11.9.0`. The initial install attempt failed because the review environment did not permit npm to create `/root/.npm`; the same clean install succeeded when an explicit writable npm cache was supplied. This was an environment restriction, not a repository dependency failure.
 
-The remaining six lint failures are `@typescript-eslint/no-explicit-any` errors in `src/App.tsx`. They occur in storage parsing, mouse-button handling and import validation. The production build does not run ESLint, so a build can pass while linting fails.
 
 ## Current data model
 
@@ -129,23 +130,23 @@ The baseline review verified that the 15-minute view renders 96 displayed blocks
 
 ### Browser storage
 
-The application currently uses the legacy storage key:
+The application continues to use the established storage key:
 
 ```text
 week_planner_5min_store_v3
 ```
 
-Embedding the schema version in the storage key is not the intended long-term design. It risks leaving older data stranded whenever the schema version changes.
+This key was deliberately preserved during the data-safety change. It is still tied to schema version 3, and that is not the intended long-term design, but no storage-key migration has been introduced yet.
 
-The preferred target is a stable key, provisionally:
+The pre-import backup key is:
 
 ```text
-week_planner_store
+week_planner_5min_pre_import_backup_v3
 ```
 
-The schema version should remain inside the stored payload.
+The backup key stores a complete version 3 payload. It is not a replacement for the main storage key.
 
-The stored payload is shaped approximately as:
+The stored payload is:
 
 ```ts
 {
@@ -155,80 +156,43 @@ The stored payload is shaped approximately as:
 }
 ```
 
-The application writes the full payload whenever plans or the active plan change.
+The application writes the full payload whenever plans or the active plan change, unless start-up has detected invalid stored data, or browser storage could not be read at start-up. Normal automatic persistence verifies the write by reading the value back. A failed save keeps the application usable and shows a persistent warning that changes are not being saved.
 
-### Start-up ordering and active-plan restoration
+### Version 3 validation boundary
 
-The application initialises `plans` and `activePlanId` together before the first render by reading the version 3 payload from `localStorage` and passing it through the shared `initialisePlannerState` helper.
+`src/domain/persistence.ts` owns the shared validation boundary for untrusted version 3 data. It accepts `unknown` input and either returns a fully validated payload or a structured validation error with a user-facing message. The same validator is used for JSON imports, browser-stored data and pre-import backups.
+
+The validator checks the top-level object, exact version `3`, non-empty `plans`, `activePlanId`, unique plan identifiers, complete plan structure, activity fields, unique activity identifiers within a plan, six-digit hex colours, 7 by 288 grids, valid grid cells, valid `selectedActivityId` values and `tool` values of only `paint` or `erase`. Plans may have no activities, but only when their grid is empty and `selectedActivityId` is `null`.
+
+A missing or unmatched `activePlanId` remains valid and falls back to the first valid plan. This preserves the active-plan restoration behaviour fixed earlier. Malformed plans are not silently repaired or discarded.
+
+### Start-up ordering and recovery
+
+The application initialises `plans` and `activePlanId` together before the first render by reading the version 3 payload from `localStorage` and validating it.
 
 Start-up behaviour is now:
 
 - valid stored data with an `activePlanId` matching an existing plan restores that plan, even when it is not the first plan
 - valid stored data with a missing or unmatched `activePlanId` falls back deliberately to the first stored plan
-- absent or malformed stored data creates and selects the normal default plan
+- absent stored data creates and selects the normal default plan
+- malformed, unsupported or structurally invalid stored data enters a recovery state before normal editing begins
+- storage read failure starts from a temporary default plan with automatic persistence disabled for that session, so unknown existing stored data is not overwritten
 
-Automatic persistence still writes the full version 3 payload whenever plans or the active plan change, but it now starts from the already-initialised state rather than from a temporary default state followed by a storage-loading effect. This protects valid stored plans from being overwritten by the temporary default state during start-up.
+Recovery mode preserves the original stored text exactly and prevents automatic persistence from overwriting it. The user can download the preserved text, open an empty replacement-import field, import a valid replacement JSON payload, restore a valid pre-import backup when one exists, or explicitly reset Week Planner to a new default plan. Invalid replacement JSON stays in the field for correction. A valid replacement import writes the replacement directly to the main key without creating a backup from the temporary default plan. Resetting requires confirmation and is the only recovery action that intentionally replaces the invalid main stored value with a default payload.
 
-### Storage-reader validation
+### Import, backup and restore
 
-The storage reader performs less validation than the import flow.
+Imports are validated completely before current in-memory plans are changed. Invalid imports are rejected as a whole, leave the current plans and active plan unchanged, do not create or replace a backup, retain the entered JSON and report the first useful user-facing validation problem.
 
-It currently confirms only that:
+Before a successful import is applied, the application writes and verifies a complete copy of the current valid payload to `week_planner_5min_pre_import_backup_v3`. If the backup write fails, the import is cancelled and the current plans remain unchanged. The imported payload is then written and verified under `week_planner_5min_store_v3` before the in-memory planner state is replaced.
 
-- JSON parsing succeeds
-- the top-level value is an object
-- `plans` is a non-empty array
-
-It does not validate the structure of individual plans before placing them into application state.
-
-### Import validation
-
-Import validation currently confirms that:
-
-- the top-level value is an object
-- `plans` is a non-empty array
-- each plan has string `id` and `name` values
-- each plan has `activities` and `grid` arrays
-- each grid has 7 columns
-- each column has 288 cells
-
-It does not fully validate:
-
-- activity structure
-- unique identifiers
-- cell values referring to valid activities
-- `selectedActivityId`
-- tool values
-- colours or icon keys
-- payload version compatibility
-- unexpectedly large strings or arrays
-- duplicate plan identifiers
-
-This difference matters because malformed persisted data can reach rendering with even fewer checks than imported data.
-
-Unknown activity identifiers in grid cells are treated as occupied when free time is calculated, but do not appear in the visible total for any known activity. Invalid data can therefore prevent displayed totals from reconciling to 168 hours.
-
-### Import recovery
-
-A successful import currently replaces the in-memory plan set and is then automatically persisted.
-
-A future import-safety change must preserve a recoverable copy of the pre-import data before replacement. Validation must complete before current plans are changed, and a failed import must leave the existing data untouched.
+The import/export interface shows a `Restore previous plans` action when a valid pre-import backup exists. Restoring validates the backup before use, writes and verifies it to the main storage key, leaves current plans unchanged on failure and removes the used backup after a successful restoration where possible.
 
 ### Storage-key migration
 
-A future storage-hardening change should:
+A future storage-hardening change should migrate from the versioned key to a stable key only after the stable-key behaviour is explicitly agreed and tested. A safe migration would need to preserve a recoverable copy, validate the legacy payload fully, write and verify the new value, and avoid removing the legacy value until recovery is proven.
 
-1. look first for valid data under the stable key
-2. fall back to `week_planner_5min_store_v3` when the stable key is absent
-3. validate the legacy payload fully
-4. migrate it to the current schema if required
-5. write the validated result to the stable key
-6. verify the new value before considering removal of the legacy key
-7. preserve a recoverable path if migration fails
-
-The exact stable key should be confirmed before implementation. `week_planner_store` is the current provisional recommendation.
-
-Do not change the key until validation, migration and representative fixture tests are in place.
+Do not add migration code for hypothetical versions 1 or 2 unless real historical data is identified.
 
 ### Repository history and older versions
 
@@ -428,7 +392,7 @@ A new dependency should provide material value in one or more of these areas:
 
 Document the reason for significant additions.
 
-A schema validation library may be justified because imported and persisted data is untrusted, but the choice should be discussed before implementation.
+A schema validation library should not be added for the current version 3 boundary. The implemented validator is clear TypeScript and has focused unit coverage.
 
 ## Deployment
 

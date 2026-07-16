@@ -51,12 +51,39 @@ Verified results:
 - dependency installation passes
 - the production build passes
 - the live deployment is reachable and matches the local build output
-- linting runs but fails with seven existing errors
+- linting ran and failed with seven existing errors at that time
 - plans survive reload
 - the previously active plan is not restored after reload
 - repository history contains no evidence of storage versions 1 or 2
 
 Detailed technical findings belong in [TECHNICAL.md](TECHNICAL.md).
+
+
+## Completed data-safety hardening
+
+Saved-data and JSON import hardening was completed on 16 July 2026.
+
+The change included:
+
+- adding a shared version 3 validation boundary for imports, browser-stored data and pre-import backups
+- preserving the existing `week_planner_5min_store_v3` main storage key and version 3 payload
+- adding a versioned pre-import backup at `week_planner_5min_pre_import_backup_v3`
+- rejecting invalid imports without changing current plans or replacing the backup
+- validating and writing a pre-import backup before successful imports replace current plans
+- adding a visible restore action for valid pre-import backups
+- entering recovery mode when browser-stored data is malformed, unsupported or structurally invalid
+- preserving invalid stored text exactly until the user imports a valid replacement or explicitly confirms a reset
+- disabling automatic persistence for the session when browser storage cannot be read at start-up
+- opening recovery replacement import with an empty field and without backing up the temporary default plan
+- warning when browser storage reads or writes fail
+- removing the remaining explicit `any` lint failures from `src/App.tsx`
+
+Verified results after the change:
+
+- `npm ci` passes
+- `npm run test` passes with 37 tests
+- `npm run lint` passes
+- `npm run build` passes
 
 ## Completed active-plan restoration fix
 
@@ -75,7 +102,7 @@ Verified results after the change:
 - `npm ci` passes
 - `npm run test` passes
 - `npm run build` passes
-- `npm run lint` still runs but fails with five remaining pre-existing explicit-`any` errors in `src/App.tsx`
+- `npm run lint` still ran and failed with five remaining pre-existing explicit-`any` errors in `src/App.tsx` at that time
 
 ## Completed test foundation
 
@@ -93,7 +120,7 @@ Verified results after the change:
 - `npm ci` passes
 - `npm run test` passes
 - `npm run build` passes
-- `npm run lint` still runs but fails with six remaining pre-existing explicit-`any` errors in `src/App.tsx`
+- `npm run lint` still ran and failed with six remaining pre-existing explicit-`any` errors in `src/App.tsx` at that time
 
 ## Completed preparation
 
@@ -137,16 +164,14 @@ With the test setup in place, extract pure logic from `App.tsx`, including:
 
 This stage should not alter the product's appearance, storage key, persisted schema or established planner behaviour.
 
-### 3. Harden storage and import
+### 3. Continue storage safety towards migration
 
-After the domain and persistence boundaries are testable:
+The current version 3 data contract is now validated and recoverable. Before changing storage keys or schemas:
 
-- validate the complete persisted structure
-- isolate browser persistence from React rendering
-- prevent automatic writes until loading and validation complete
-- preserve a recoverable pre-import copy
-- introduce an explicit safe migration path before changing the storage key
-- handle storage write failures
+- decide the future stable storage key
+- design and test a migration from `week_planner_5min_store_v3`
+- preserve a recoverable copy before any destructive migration
+- keep the versioned backup and recovery behaviour intact
 
 Do not add version 1 or version 2 migration code unless real historical data is identified.
 
@@ -190,17 +215,9 @@ New features must support intentional weekly allocation and should not turn the 
 
 ### High priority
 
-#### Saved data has insufficient validation
-
-The storage reader validates less than the already limited import validator. Malformed data can enter application state and may be written back.
-
 #### The storage key embeds the schema version
 
 The current key, `week_planner_5min_store_v3`, is tied to one schema version. It must not be changed until a tested migration and recovery path exists.
-
-#### Destructive import lacks recovery
-
-A successful import replaces the current plans. A future safety change must preserve a recoverable pre-import copy.
 
 #### `App.tsx` has too many responsibilities
 
@@ -208,9 +225,9 @@ The application is difficult to change safely because persistence, interactions 
 
 ### Medium priority
 
-#### Linting currently fails
+#### Linting currently passes
 
-There are six remaining explicit-`any` errors in `src/App.tsx`. The production build and deployment workflow do not run linting.
+`npm run lint` passes after the data-safety change removed the remaining explicit `any` usage. The deployment workflow still does not run linting.
 
 #### Deployment has no test or lint gate
 
@@ -250,9 +267,9 @@ The repository does not currently state reuse or redistribution terms.
 
 The next implementation task should be:
 
-> Harden storage and import while preserving the current storage key and version 3 payload.
+> Add test and lint gates to the GitHub Pages deployment workflow.
 
-The active-plan restoration bug is resolved. The next safety improvement should validate persisted data more fully, isolate browser persistence further from rendering, and add recovery around destructive imports without changing the storage key or schema casually.
+Storage and import validation are now hardened for the existing version 3 payload. The next safety improvement should prevent regressions by running the existing automated checks in CI before deployment.
 
 ## Roadmap
 
@@ -346,7 +363,7 @@ Repository history contains no evidence of storage versions 1 or 2. Migration su
 
 ### 16 July 2026: Import recovery
 
-A future import-safety change should preserve a recoverable copy of the current data before a successful import replaces it.
+Successful imports preserve a recoverable version 3 copy of the current data before replacing plans. Invalid imports leave current plans unchanged.
 
 ## Open decisions
 
