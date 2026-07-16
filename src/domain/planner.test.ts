@@ -3,6 +3,7 @@ import {
   buildEmptyWeek,
   clearGridForActivity,
   formatMinutes,
+  hexWithAlpha,
   iconLabel,
   reorderByIndex,
   safeParseJSON,
@@ -35,6 +36,10 @@ describe("planner helpers", () => {
   it("formats minute totals", () => {
     expect(formatMinutes(0)).toBe("0h 00m");
     expect(formatMinutes(65)).toBe("1h 05m");
+  });
+
+  it("adds an alpha channel to hex colours", () => {
+    expect(hexWithAlpha("#000000", 0.5)).toBe("rgba(0, 0, 0, 0.5)");
   });
 
   it("parses valid JSON and reports invalid JSON", () => {
