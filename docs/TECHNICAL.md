@@ -12,6 +12,7 @@ The repository currently declares:
 - React DOM `^19.2.3`
 - TypeScript `~5.9.3`
 - Vite `^7.3.1`
+- Vitest `^4.1.10`
 - Tailwind CSS `^4.1.18`
 - Lucide React `^0.562.0`
 - ESLint `^9.39.2`
@@ -22,11 +23,13 @@ The application is a client-side React application with no current backend.
 
 - `index.html` provides the root element and page metadata.
 - `src/main.tsx` creates the React root in `StrictMode`.
-- `src/App.tsx` contains the application data types, state, domain operations, storage handling, interactions and most of the rendered interface.
+- `src/App.tsx` contains the React state, storage handling, interactions and most of the rendered interface.
+- `src/domain/planner.ts` contains shared planner types and extracted pure helper logic.
+- `src/domain/planner.test.ts` contains Vitest unit tests for the extracted planner helpers.
 - `src/index.css` imports Tailwind and globally hides scrollbars.
 - `vite.config.ts` configures React and the `/week-planner/` base path.
 
-At the time of review, `src/App.tsx` is 1,461 lines and has too many responsibilities. This is a maintainability concern, but it is not by itself justification for a broad rewrite.
+At the time of the unit-test extraction, `src/App.tsx` is 1,316 lines and still has too many responsibilities. This is a maintainability concern, but it is not by itself justification for a broad rewrite.
 
 The repository also retains unused starter files and metadata, including `src/App.css`, `src/assets/react.svg` and the package name `vite-react-typescript-starter`.
 
@@ -39,11 +42,12 @@ The repository declares:
   "dev": "vite",
   "build": "tsc -b --noEmit && vite build",
   "lint": "eslint .",
-  "preview": "vite preview"
+  "preview": "vite preview",
+  "test": "vitest run"
 }
 ```
 
-There is currently no automated test command.
+The automated unit-test command is `npm run test`, which runs Vitest once.
 
 The baseline review on 16 July 2026 verified:
 
@@ -54,7 +58,7 @@ The baseline review on 16 July 2026 verified:
 
 The review used Node.js `24.14.0` and npm `11.9.0`. The initial install attempt failed because the review environment did not permit npm to create `/root/.npm`; the same clean install succeeded when an explicit writable npm cache was supplied. This was an environment restriction, not a repository dependency failure.
 
-All seven lint failures are `@typescript-eslint/no-explicit-any` errors in `src/App.tsx`. They occur in development assertions, storage parsing, mouse-button handling and import validation. The production build does not run ESLint, so a build can pass while linting fails.
+The remaining six lint failures are `@typescript-eslint/no-explicit-any` errors in `src/App.tsx`. They occur in storage parsing, mouse-button handling and import validation. The production build does not run ESLint, so a build can pass while linting fails.
 
 ## Current data model
 
@@ -340,9 +344,9 @@ Accessibility should be designed alongside interaction changes rather than added
 
 ## Testing
 
-The application currently contains development-only `console.assert` checks inside `App.tsx`.
+The application now has a formal Vitest unit-test foundation for extracted planner helpers.
 
-They cover several helper behaviours, including:
+The initial helper tests cover:
 
 - week dimensions
 - time labels
@@ -353,7 +357,7 @@ They cover several helper behaviours, including:
 - clearing activity cells
 - icon labels
 
-These checks are useful evidence of intended behaviour, but they are not a formal automated test suite.
+These tests replace the previous development-only `console.assert` checks in `App.tsx`.
 
 ### Recommended testing layers
 
