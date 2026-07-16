@@ -550,6 +550,19 @@ describe("grouped-block summaries", () => {
     });
   });
 
+  it("orders tied activity time before free time even when free cells appear first", () => {
+    const grid = buildEmptyWeek();
+    grid[0].splice(0, 2, null, "activity-a");
+
+    expect(summariseGroupedBlock(grid, 0, 0, 2)).toEqual({
+      kind: "mixed",
+      segments: [
+        { activityId: "activity-a", cellCount: 1 },
+        { activityId: null, cellCount: 1 },
+      ],
+    });
+  });
+
   it("includes free time in mixed proportions", () => {
     const grid = buildEmptyWeek();
     grid[0][0] = "activity-a";
@@ -561,6 +574,29 @@ describe("grouped-block summaries", () => {
         { activityId: "activity-a", cellCount: 1 },
       ],
     });
+  });
+
+  it("treats a block containing only empty-string cells as free", () => {
+    const grid = buildEmptyWeek();
+    grid[0].splice(0, 3, "", "", "");
+
+    expect(summariseGroupedBlock(grid, 0, 0, 3)).toEqual({ kind: "free" });
+  });
+
+  it("treats empty-string cells as free time in a mixed block", () => {
+    const grid = buildEmptyWeek();
+    grid[0].splice(0, 3, "", "activity-a", "");
+
+    const summary = summariseGroupedBlock(grid, 0, 0, 3);
+
+    expect(summary).toEqual({
+      kind: "mixed",
+      segments: [
+        { activityId: null, cellCount: 2 },
+        { activityId: "activity-a", cellCount: 1 },
+      ],
+    });
+    expect(summary.kind === "mixed" && summary.segments.some((segment) => segment.activityId === "")).toBe(false);
   });
 
   it("retains an unknown activity identifier", () => {

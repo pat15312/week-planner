@@ -134,20 +134,29 @@ export function summariseGroupedBlock(
   numRows: number,
 ): GroupedBlockSummary {
   const ids = grid?.[dayIndex]?.slice(startRow, startRow + numRows) ?? [];
-  const counts = new Map<string | null, number>();
+  const activityCounts = new Map<string, number>();
+  let freeCount = 0;
 
-  for (const id of ids) counts.set(id ?? null, (counts.get(id ?? null) ?? 0) + 1);
-
-  if (counts.size === 0 || (counts.size === 1 && counts.has(null))) return { kind: "free" };
-
-  if (counts.size === 1) {
-    const activityId = Array.from(counts.keys())[0];
-    if (activityId !== null) return { kind: "single", activityId };
+  for (const id of ids) {
+    if (!id) freeCount++;
+    else activityCounts.set(id, (activityCounts.get(id) ?? 0) + 1);
   }
 
-  const segments = Array.from(counts.entries())
-    .map(([activityId, cellCount]) => ({ activityId, cellCount }))
-    .sort((a, b) => b.cellCount - a.cellCount);
+  if (activityCounts.size === 0) return { kind: "free" };
+
+  if (activityCounts.size === 1 && freeCount === 0) {
+    const activityId = Array.from(activityCounts.keys())[0];
+    return { kind: "single", activityId };
+  }
+
+  const segments: GroupedBlockSegment[] = Array.from(activityCounts.entries()).map(([activityId, cellCount]) => ({
+    activityId,
+    cellCount,
+  }));
+
+  if (freeCount > 0) segments.push({ activityId: null, cellCount: freeCount });
+
+  segments.sort((a, b) => b.cellCount - a.cellCount);
 
   return { kind: "mixed", segments };
 }

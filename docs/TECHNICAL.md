@@ -251,7 +251,6 @@ Pure helper functions already exist for operations such as:
 - clearing an activity from the grid
 - painting or erasing an immutable grid range
 - summarising grouped grid blocks
-- cloning data
 - converting colour values
 
 Further extraction should be incremental. `App.tsx` still owns interaction state, browser effects and rendering concerns.
@@ -333,14 +332,13 @@ These tests replace the previous development-only `console.assert` checks in `Ap
 
 #### Unit tests
 
-Extract and test:
+Maintain and extend unit tests for:
 
-- time calculations
-- weekly totals
-- plan creation and duplication
-- activity deletion and clearing
+- time calculations and weekly totals
+- plan operations and activity clearing
+- grouped-block and grid range behaviour
 - import validation
-- schema migration
+- schema migration when a storage schema change is approved
 - identifier handling
 
 #### Component tests
