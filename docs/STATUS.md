@@ -282,7 +282,7 @@ The next implementation task should be:
 
 > Extract allocation summary and plan operation logic from `src/App.tsx` into tested domain helpers.
 
-CI now blocks pull-request regressions and deployment regressions with install, lint, test and build checks. The next safety improvement should continue reducing the size and responsibility of `src/App.tsx` without changing application behaviour, storage keys or the persisted schema.
+CI now detects pull-request regressions before merge and blocks GitHub Pages deployment when install, lint, test or build checks fail. The next safety improvement should continue reducing the size and responsibility of `src/App.tsx` without changing application behaviour, storage keys or the persisted schema.
 
 ## Roadmap
 
