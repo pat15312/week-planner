@@ -100,6 +100,58 @@ export function reorderByIndex<T>(list: T[], fromIndex: number, toIndex: number)
   return next;
 }
 
+export function updateGridRange(
+  grid: WeekGrid,
+  dayIndex: number,
+  startRow: number,
+  numRows: number,
+  activityIdOrNull: string | null,
+): WeekGrid {
+  const nextGrid = grid.map((day) => day.slice());
+  const day = nextGrid[dayIndex];
+  if (!day) return nextGrid;
+
+  const end = Math.min(CELLS_PER_DAY, startRow + numRows);
+  for (let row = startRow; row < end; row++) day[row] = activityIdOrNull;
+
+  return nextGrid;
+}
+
+export type GroupedBlockSummary =
+  | { kind: "free" }
+  | { kind: "single"; activityId: string }
+  | { kind: "mixed"; segments: GroupedBlockSegment[] };
+
+export type GroupedBlockSegment = {
+  activityId: string | null;
+  cellCount: number;
+};
+
+export function summariseGroupedBlock(
+  grid: WeekGrid,
+  dayIndex: number,
+  startRow: number,
+  numRows: number,
+): GroupedBlockSummary {
+  const ids = grid?.[dayIndex]?.slice(startRow, startRow + numRows) ?? [];
+  const counts = new Map<string | null, number>();
+
+  for (const id of ids) counts.set(id ?? null, (counts.get(id ?? null) ?? 0) + 1);
+
+  if (counts.size === 0 || (counts.size === 1 && counts.has(null))) return { kind: "free" };
+
+  if (counts.size === 1) {
+    const activityId = Array.from(counts.keys())[0];
+    if (activityId !== null) return { kind: "single", activityId };
+  }
+
+  const segments = Array.from(counts.entries())
+    .map(([activityId, cellCount]) => ({ activityId, cellCount }))
+    .sort((a, b) => b.cellCount - a.cellCount);
+
+  return { kind: "mixed", segments };
+}
+
 export type PlannerState = {
   plans: Plan[];
   activePlanId: string | null;
