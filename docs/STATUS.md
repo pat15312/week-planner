@@ -4,7 +4,7 @@ Last updated: 16 July 2026
 
 ## Current stage
 
-Week Planner is entering a structured improvement phase.
+Week Planner is in a structured improvement phase.
 
 The immediate objective is to establish a reliable Codex workflow, document the current product and strengthen the existing React application before considering a native SwiftUI rebuild.
 
@@ -24,7 +24,7 @@ The repository contains a working client-side application with:
 - JSON import and export
 - browser `localStorage` persistence
 
-The current architecture is concentrated heavily in `src/App.tsx`.
+The current architecture is still concentrated heavily in `src/App.tsx`, but shared planner types and the first pure helper functions now live in `src/domain/planner.ts`.
 
 The application is deployed through GitHub Actions to:
 
@@ -57,6 +57,24 @@ Verified results:
 - repository history contains no evidence of storage versions 1 or 2
 
 Detailed technical findings belong in [TECHNICAL.md](TECHNICAL.md).
+
+## Completed test foundation
+
+The initial unit-test foundation was completed on 16 July 2026.
+
+It included:
+
+- adding Vitest and an `npm run test` script
+- extracting shared planner types and pure helper logic into `src/domain/planner.ts`
+- replacing development-only helper assertions with formal unit tests
+- preserving the existing storage key, persisted schema, visual interface and established planner behaviour
+
+Verified results after the change:
+
+- `npm ci` passes
+- `npm run test` passes
+- `npm run build` passes
+- `npm run lint` still runs but fails with six remaining pre-existing explicit-`any` errors in `src/App.tsx`
 
 ## Completed preparation
 
@@ -159,10 +177,6 @@ New features must support intentional weekly allocation and should not turn the 
 
 ### High priority
 
-#### No formal automated test suite
-
-Development-only assertions do not provide a repeatable CI safety net.
-
 #### Active plan is not restored
 
 Saved plans survive reload, but the application returns to the first plan rather than restoring the stored active plan.
@@ -185,13 +199,13 @@ A successful import replaces the current plans. A future safety change must pres
 
 #### `App.tsx` has too many responsibilities
 
-The application is difficult to change safely because domain, persistence, interactions and presentation are combined.
+The application is difficult to change safely because persistence, interactions and presentation are still combined. The first shared planner types and pure helpers have been extracted.
 
 ### Medium priority
 
 #### Linting currently fails
 
-There are seven existing explicit-`any` errors in `src/App.tsx`. The production build and deployment workflow do not run linting.
+There are six remaining explicit-`any` errors in `src/App.tsx`. The production build and deployment workflow do not run linting.
 
 #### Deployment has no test or lint gate
 
@@ -231,11 +245,9 @@ The repository does not currently state reuse or redistribution terms.
 
 The next implementation task should be:
 
-> Introduce a formal unit-test setup and extract the pure planner helper functions from `App.tsx` without changing visual appearance, established planner behaviour, the storage key or the persisted schema.
+> Fix active-plan restoration with a small, explicit unit-tested change.
 
-This should come first because it creates a safety net for later bug fixes and persistence work.
-
-The active-plan restoration bug should then be fixed as a separate tested increment.
+The initial unit-test foundation is now in place. The active-plan restoration bug should be fixed as a separate increment rather than hidden inside further refactoring.
 
 ## Roadmap
 

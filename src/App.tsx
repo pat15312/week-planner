@@ -29,6 +29,22 @@ import {
   X,
   Trash2,
 } from "lucide-react";
+import {
+  clearGridForActivity,
+  cloneDeep,
+  formatMinutes,
+  hexWithAlpha,
+  iconLabel,
+  makeDefaultPlan,
+  reorderByIndex,
+  safeParseJSON,
+  timeLabelForRow,
+  timeRangeLabel,
+  uid,
+  type Activity,
+  type Plan,
+  type ToolMode,
+} from "./domain/planner";
 
 // Weekly 5-minute Planner v3
 // - Multiple saved plans (localStorage)
@@ -91,168 +107,11 @@ const ICONS = [
   { key: "walking", Icon: Route },
 ];
 
-function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
-
-function timeLabelForRow(rowIndex: number) {
-  const totalMins = rowIndex * 5;
-  const hh = Math.floor(totalMins / 60);
-  const mm = totalMins % 60;
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-}
-
-function timeRangeLabel(startRow: number, numRows: number) {
-  const startMins = startRow * 5;
-  const endMins = (startRow + numRows) * 5;
-  const startHH = Math.floor(startMins / 60);
-  const startMM = startMins % 60;
-  const endHH = Math.floor(endMins / 60);
-  const endMM = endMins % 60;
-  return `${String(startHH).padStart(2, "0")}:${String(startMM).padStart(2, "0")}-${String(endHH).padStart(2, "0")}:${String(endMM).padStart(2, "0")}`;
-}
-
-function buildEmptyWeek() {
-  return Array.from({ length: 7 }, () => Array.from({ length: 288 }, () => null as string | null));
-}
-
-function safeParseJSON(s: string) {
-  try {
-    return { ok: true as const, value: JSON.parse(s) };
-  } catch (e) {
-    return { ok: false as const, error: String(e) };
-  }
-}
-
 function getIconComponent(iconKey: string) {
   return ICONS.find((i) => i.key === iconKey)?.Icon ?? Calendar;
 }
 
-function iconLabel(key: string) {
-  return key
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/_/g, " ")
-    .replace(/(\d+)/g, " $1")
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-function hexWithAlpha(hex: string, alpha = 0.16) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!m) return `rgba(0,0,0,${alpha})`;
-  const r = parseInt(m[1], 16);
-  const g = parseInt(m[2], 16);
-  const b = parseInt(m[3], 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function formatMinutes(totalMinutes: number) {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${h}h ${String(m).padStart(2, "0")}m`;
-}
-
-function cloneDeep<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
-}
-
-function clearGridForActivity(grid: (string | null)[][], activityId: string) {
-  return grid.map((col) => col.map((cell) => (cell === activityId ? null : cell)));
-}
-
-function reorderByIndex<T>(list: T[], fromIndex: number, toIndex: number) {
-  if (!Array.isArray(list)) return list;
-  const n = list.length;
-  if (fromIndex < 0 || fromIndex >= n) return list;
-  if (toIndex < 0) toIndex = 0;
-  if (toIndex >= n) toIndex = n - 1;
-  if (fromIndex === toIndex) return list;
-
-  const next = list.slice();
-  const [item] = next.splice(fromIndex, 1);
-  next.splice(toIndex, 0, item);
-  return next;
-}
-
-type ToolMode = "paint" | "erase";
-
-type Activity = {
-  id: string;
-  name: string;
-  colour: string;
-  icon: string;
-};
-
-type Plan = {
-  id: string;
-  name: string;
-  activities: Activity[];
-  grid: (string | null)[][]; // [day][row]
-  selectedActivityId: string | null;
-  tool: ToolMode;
-};
-
 type PlanModalMode = "new" | "rename" | "duplicate" | "delete";
-
-function makeDefaultPlan(name = "Default"): Plan {
-  return {
-    id: `p_${uid()}`,
-    name,
-    activities: [
-      { id: "a_work", name: "Work", colour: "#E11D48", icon: "briefcase" },
-      { id: "a_family", name: "Family", colour: "#0EA5E9", icon: "users" },
-      { id: "a_sleep", name: "Sleep", colour: "#64748B", icon: "bed" },
-      { id: "a_admin", name: "Admin", colour: "#22C55E", icon: "laptop" },
-    ],
-    grid: buildEmptyWeek(),
-    selectedActivityId: "a_work",
-    tool: "paint",
-  };
-}
-
-function runSelfTests() {
-  const empty = buildEmptyWeek();
-  console.assert(empty.length === 7, "Expected 7 day columns");
-  console.assert(empty.every((c) => Array.isArray(c) && c.length === 288), "Expected 288 rows per day");
-  console.assert(timeLabelForRow(0) === "00:00", "Row 0 should label 00:00");
-  console.assert(timeLabelForRow(12) === "01:00", "Row 12 should label 01:00");
-  console.assert(timeLabelForRow(287) === "23:55", "Row 287 should label 23:55");
-  console.assert(timeRangeLabel(0, 1) === "00:00-00:05", "5-minute range should format correctly");
-  console.assert(timeRangeLabel(0, 3) === "00:00-00:15", "15-minute range should format correctly");
-  console.assert(timeRangeLabel(0, 12) === "00:00-01:00", "1-hour range should format correctly");
-  console.assert(formatMinutes(65) === "1h 05m", "65 minutes formats as 1h 05m");
-  console.assert(hexWithAlpha("#000000", 0.5) === "rgba(0, 0, 0, 0.5)", "hexWithAlpha should convert correctly");
-
-  const parsedOk = safeParseJSON("{\"a\":1}");
-  console.assert(parsedOk.ok && (parsedOk.value as any).a === 1, "safeParseJSON should parse valid JSON");
-  const parsedBad = safeParseJSON("{");
-  console.assert(!parsedBad.ok, "safeParseJSON should fail invalid JSON");
-
-  const reordered1 = reorderByIndex(["a", "b", "c"], 0, 2);
-  console.assert(reordered1.join(",") === "b,c,a", "reorderByIndex should move item down");
-
-  const reordered2 = reorderByIndex(["a", "b", "c"], 2, 0);
-  console.assert(reordered2.join(",") === "c,a,b", "reorderByIndex should move item up");
-
-  const reordered3 = reorderByIndex(["a", "b", "c"], 1, 1);
-  console.assert(reordered3.join(",") === "a,b,c", "reorderByIndex should be stable if no move");
-
-  const reordered4 = reorderByIndex(["a", "b", "c", "d"], 1, 3);
-  console.assert(reordered4.join(",") === "a,c,d,b", "reorderByIndex should support moving an item to the bottom");
-
-  const g: (string | null)[][] = [["x", "y"], ["y", null]];
-  const cleared = clearGridForActivity(g, "y");
-  console.assert(
-    cleared[0][0] === "x" && cleared[0][1] === null && cleared[1][0] === null,
-    "clearGridForActivity should clear matching cells"
-  );
-
-  console.assert(iconLabel("briefcase") === "Briefcase", "iconLabel should Title Case single words");
-  console.assert(iconLabel("gamepad2") === "Gamepad 2", "iconLabel should space digits");
-  console.assert(iconLabel("book_open") === "Book Open", "iconLabel should replace underscores");
-}
 
 export default function App() {
   const [plans, setPlans] = useState<Plan[]>(() => [makeDefaultPlan("Default")]);
@@ -299,10 +158,6 @@ export default function App() {
         height: number;
       }
   >(null);
-
-  useEffect(() => {
-    if (import.meta.env.DEV) runSelfTests();
-  }, []);
 
   const activePlan = useMemo<Plan>(() => plans.find((p) => p.id === activePlanId) ?? plans[0], [plans, activePlanId]);
 
