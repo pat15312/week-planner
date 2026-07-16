@@ -30,12 +30,16 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  addPlanAndSelect,
+  calculateAllocationSummary,
   clearGridForActivity,
-  cloneDeep,
   formatMinutes,
   hexWithAlpha,
   iconLabel,
+  deletePlanAndSelectFallback,
+  duplicatePlanAndSelect,
   makeDefaultPlan,
+  renamePlan,
   reorderByIndex,
   timeLabelForRow,
   timeRangeLabel,
@@ -282,34 +286,7 @@ export default function App() {
     return m;
   }, [activePlan.activities]);
 
-  const allocationSummary = useMemo(() => {
-    const counts = new Map<string, number>();
-    let freeCells = 0;
-
-    for (let day = 0; day < 7; day++) {
-      const col = activePlan.grid?.[day] ?? [];
-      for (let row = 0; row < 288; row++) {
-        const v = col[row] ?? null;
-        if (!v) {
-          freeCells++;
-          continue;
-        }
-        counts.set(v, (counts.get(v) ?? 0) + 1);
-      }
-    }
-
-    const minutesById = new Map<string, number>();
-    for (const a of activePlan.activities) {
-      const cells = counts.get(a.id) ?? 0;
-      minutesById.set(a.id, cells * 5);
-    }
-
-    return {
-      minutesById,
-      freeMinutes: freeCells * 5,
-      totalMinutes: 7 * 288 * 5,
-    };
-  }, [activePlan.activities, activePlan.grid]);
+  const allocationSummary = useMemo(() => calculateAllocationSummary(activePlan), [activePlan]);
 
   function applyRange(dayIndex: number, startRow: number, len: number, activityIdOrNull: string | null) {
     updateActivePlan((p) => {
@@ -551,24 +528,19 @@ export default function App() {
 
     if (planModalMode === "new") {
       const p = makeDefaultPlan(trimmed);
-      setPlans((prev) => [...prev, p]);
-      setActivePlanId(p.id);
+      setPlannerState((prev) => addPlanAndSelect(prev, p));
       setPlanModalOpen(false);
       return;
     }
 
     if (planModalMode === "rename") {
-      setPlans((prev) => prev.map((p) => (p.id === activePlan.id ? { ...p, name: trimmed } : p)));
+      setPlannerState((prev) => renamePlan(prev, activePlan.id, trimmed));
       setPlanModalOpen(false);
       return;
     }
 
     if (planModalMode === "duplicate") {
-      const copyPlan = cloneDeep(activePlan);
-      copyPlan.id = `p_${uid()}`;
-      copyPlan.name = trimmed;
-      setPlans((prev) => [...prev, copyPlan]);
-      setActivePlanId(copyPlan.id);
+      setPlannerState((prev) => duplicatePlanAndSelect(prev, activePlan.id, `p_${uid()}`, trimmed));
       setPlanModalOpen(false);
       return;
     }
@@ -579,10 +551,7 @@ export default function App() {
         return;
       }
 
-      const currentId = activePlan.id;
-      const remaining = plans.filter((p) => p.id !== currentId);
-      setPlans(remaining);
-      setActivePlanId(remaining[0]?.id ?? null);
+      setPlannerState((prev) => deletePlanAndSelectFallback(prev, activePlan.id));
       setPlanModalOpen(false);
     }
   }

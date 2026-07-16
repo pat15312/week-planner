@@ -110,6 +110,18 @@ The full week therefore contains 2,016 cells and represents 10,080 minutes, or 1
 
 This model is simple and explicit. It is suitable for accurate allocation and portable serialisation, although storage and rendering concerns should be separated from the domain model during refactoring.
 
+## Domain planner helpers
+
+`src/domain/planner.ts` owns shared planner types and pure helpers for deterministic planner behaviour. It currently includes:
+
+- time label, range label and minute formatting helpers
+- empty-week construction for the seven-day, 288-cell-per-day, five-minute grid
+- allocation summaries for activity minutes, free minutes and the 10,080-minute week total
+- pure plan operations for adding and selecting a constructed plan, renaming a requested plan, duplicating a requested plan with supplied identifiers and deleting a requested plan with the established active-plan fallback
+- simple grid and list helpers used by activity operations and reordering
+
+The plan-operation helpers do not generate identifiers, read browser APIs, manage modals or perform validation of interface drafts. Those responsibilities remain in `src/App.tsx` and the persistence boundary. Missing target plans are treated as safe no-ops, and deleting the final remaining plan leaves planner state unchanged.
+
 ## View scales
 
 The underlying data always remains at five-minute resolution.
