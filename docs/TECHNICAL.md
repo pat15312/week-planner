@@ -117,10 +117,12 @@ This model is simple and explicit. It is suitable for accurate allocation and po
 - time label, range label and minute formatting helpers
 - empty-week construction for the seven-day, 288-cell-per-day, five-minute grid
 - allocation summaries for activity minutes, free minutes and the 10,080-minute week total
+- immutable grid range updates that copy the week grid and requested day before painting or erasing a clamped range of underlying five-minute cells
+- structured grouped-block summaries that classify a viewed block as free, a single activity identifier or ordered mixed segments with five-minute cell counts
 - pure plan operations for adding and selecting a constructed plan, renaming a requested plan, duplicating a requested plan with supplied identifiers and deleting a requested plan with the established active-plan fallback
 - simple grid and list helpers used by activity operations and reordering
 
-The plan-operation helpers do not generate identifiers, read browser APIs, manage modals or perform validation of interface drafts. Those responsibilities remain in `src/App.tsx` and the persistence boundary. Missing target plans are treated as safe no-ops, and deleting the final remaining plan leaves planner state unchanged.
+The plan-operation helpers do not generate identifiers, read browser APIs, manage modals or perform validation of interface drafts. Those responsibilities remain in `src/App.tsx` and the persistence boundary. Missing target plans are treated as safe no-ops, and deleting the final remaining plan leaves planner state unchanged. Grid and grouped-block helpers return data only. React presentation remains responsible for activity lookup, colours, icons, CSS gradients, tooltip wording and browser events.
 
 ## View scales
 
@@ -132,7 +134,7 @@ The displayed scale groups cells as follows:
 - 15-minute view: 3 stored cells
 - 1-hour view: 12 stored cells
 
-Mixed grouped blocks are rendered as proportional colour stripes.
+Mixed grouped blocks are summarised by domain logic and rendered by `App.tsx` as proportional colour stripes. The summary keeps unknown activity identifiers so the presentation layer can apply the established fallback wording and colour.
 
 Painting in a grouped view overwrites every underlying five-minute cell represented by that block. This is established behaviour and must be preserved or deliberately changed as a product decision.
 
@@ -247,10 +249,11 @@ Pure helper functions already exist for operations such as:
 - parsing JSON safely
 - reordering arrays
 - clearing an activity from the grid
-- cloning data
+- painting or erasing an immutable grid range
+- summarising grouped grid blocks
 - converting colour values
 
-These functions are good candidates for extraction into tested domain modules.
+Further extraction should be incremental. `App.tsx` still owns interaction state, browser effects and rendering concerns.
 
 ## Current interactions
 
@@ -329,15 +332,13 @@ These tests replace the previous development-only `console.assert` checks in `Ap
 
 #### Unit tests
 
-Extract and test:
+Maintain and extend unit tests for:
 
-- time calculations
-- weekly totals
-- grouped-block calculations
-- plan creation and duplication
-- activity deletion and clearing
+- time calculations and weekly totals
+- plan operations and activity clearing
+- grouped-block and grid range behaviour
 - import validation
-- schema migration
+- schema migration when a storage schema change is approved
 - identifier handling
 
 #### Component tests

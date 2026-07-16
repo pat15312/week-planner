@@ -24,7 +24,7 @@ The repository contains a working client-side application with:
 - JSON import and export
 - browser `localStorage` persistence
 
-The current architecture is still concentrated heavily in `src/App.tsx`, but shared planner types and the first pure helper functions now live in `src/domain/planner.ts`.
+The current architecture is still concentrated heavily in `src/App.tsx`, but shared planner types, pure planner operations, immutable grid updates and grouped-block summaries now live in `src/domain/planner.ts`.
 
 The application is deployed through GitHub Actions to:
 
@@ -164,6 +164,29 @@ Verified results after the change:
 
 Browser manual checks were not performed because browser execution was unavailable in this environment.
 
+
+## Completed grid domain extraction
+
+Grid range update and grouped-block summary extraction was completed on 16 July 2026.
+
+The change included:
+
+- moving immutable grid range painting and erasing from `src/App.tsx` into `src/domain/planner.ts`
+- moving grouped-block calculation into a structured domain helper that returns free, single-activity or mixed segment data without CSS or React presentation details
+- preserving activity lookup, colours, icons, gradient construction, tooltip wording, pointer handling and state updates in `src/App.tsx`
+- adding focused Vitest coverage for five-minute, 15-minute and one-hour grid updates, clamping, overwriting, erasing, grouped block ordering, free time, unknown identifiers and immutability
+- completing the currently planned pure-logic extraction sequence
+
+Verified results after the change:
+
+- `npm ci` passes
+- `npm run lint` passes
+- `npm run test` passes with 70 tests
+- `npm run build` passes
+- `git diff --check` passes
+
+Browser manual checks were not performed because browser execution was unavailable in this environment.
+
 ## Completed preparation
 
 The following preparation has been completed:
@@ -192,19 +215,9 @@ Before substantial refactoring:
 - test export and import boundaries
 - test destructive plan and activity operations
 
-### 2. Extract pure planner logic
+### 2. Maintain extracted pure planner logic
 
-With the test setup in place, extract pure logic from `App.tsx`, including:
-
-- types
-- week creation
-- time formatting
-- plan operations
-- grid operations
-- allocation summaries
-- current import validation
-
-This stage should not alter the product's appearance, storage key, persisted schema or established planner behaviour.
+The currently planned pure-logic extraction sequence is complete. Future pure helper extraction should be considered only when it supports a specific reviewed change and can preserve the product's appearance, storage key, persisted schema and established planner behaviour.
 
 ### 3. Continue storage safety towards migration
 
@@ -263,7 +276,7 @@ The current key, `week_planner_5min_store_v3`, is tied to one schema version. It
 
 #### `App.tsx` has too many responsibilities
 
-The application is difficult to change safely because persistence, interactions, grouped-grid rendering and presentation are still combined. Shared planner types, allocation summaries and pure plan operations have been extracted.
+The application is difficult to change safely because persistence, interactions and presentation are still combined. Shared planner types, allocation summaries, pure plan operations, grid updates and grouped-block calculations have been extracted, but `App.tsx` still owns substantial rendering, event handling and browser-effect responsibilities.
 
 ### Medium priority
 
@@ -301,9 +314,9 @@ The repository does not currently state reuse or redistribution terms.
 
 The next implementation task should be:
 
-> Extract grid range updates and grouped-block calculations from `src/App.tsx` into tested domain helpers.
+> Discuss and agree the first mobile usability slice, including day navigation and touch editing, before implementation.
 
-CI now detects pull-request regressions before merge and blocks GitHub Pages deployment when install, lint, test or build checks fail. The next safety improvement should continue reducing the size and responsibility of `src/App.tsx` without changing application behaviour, storage keys or the persisted schema.
+The pure-logic extraction sequence is complete. The next work should not make material mobile product decisions inside an implementation task. The project owner should first agree the intended small-screen navigation and touch editing behaviour, then Codex can implement a focused slice without changing storage keys or the persisted schema.
 
 ## Roadmap
 

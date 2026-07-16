@@ -100,6 +100,67 @@ export function reorderByIndex<T>(list: T[], fromIndex: number, toIndex: number)
   return next;
 }
 
+export function updateGridRange(
+  grid: WeekGrid,
+  dayIndex: number,
+  startRow: number,
+  numRows: number,
+  activityIdOrNull: string | null,
+): WeekGrid {
+  const nextGrid = grid.map((day) => day.slice());
+  const day = nextGrid[dayIndex];
+  if (!day) return nextGrid;
+
+  const end = Math.min(CELLS_PER_DAY, startRow + numRows);
+  for (let row = startRow; row < end; row++) day[row] = activityIdOrNull;
+
+  return nextGrid;
+}
+
+export type GroupedBlockSummary =
+  | { kind: "free" }
+  | { kind: "single"; activityId: string }
+  | { kind: "mixed"; segments: GroupedBlockSegment[] };
+
+export type GroupedBlockSegment = {
+  activityId: string | null;
+  cellCount: number;
+};
+
+export function summariseGroupedBlock(
+  grid: WeekGrid,
+  dayIndex: number,
+  startRow: number,
+  numRows: number,
+): GroupedBlockSummary {
+  const ids = grid?.[dayIndex]?.slice(startRow, startRow + numRows) ?? [];
+  const activityCounts = new Map<string, number>();
+  let freeCount = 0;
+
+  for (const id of ids) {
+    if (!id) freeCount++;
+    else activityCounts.set(id, (activityCounts.get(id) ?? 0) + 1);
+  }
+
+  if (activityCounts.size === 0) return { kind: "free" };
+
+  if (activityCounts.size === 1 && freeCount === 0) {
+    const activityId = Array.from(activityCounts.keys())[0];
+    return { kind: "single", activityId };
+  }
+
+  const segments: GroupedBlockSegment[] = Array.from(activityCounts.entries()).map(([activityId, cellCount]) => ({
+    activityId,
+    cellCount,
+  }));
+
+  if (freeCount > 0) segments.push({ activityId: null, cellCount: freeCount });
+
+  segments.sort((a, b) => b.cellCount - a.cellCount);
+
+  return { kind: "mixed", segments };
+}
+
 export type PlannerState = {
   plans: Plan[];
   activePlanId: string | null;

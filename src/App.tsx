@@ -32,6 +32,7 @@ import {
 import {
   addPlanAndSelect,
   calculateAllocationSummary,
+  CELLS_PER_DAY,
   clearGridForActivity,
   formatMinutes,
   hexWithAlpha,
@@ -41,9 +42,11 @@ import {
   makeDefaultPlan,
   renamePlan,
   reorderByIndex,
+  summariseGroupedBlock,
   timeLabelForRow,
   timeRangeLabel,
   uid,
+  updateGridRange,
   type Activity,
   type Plan,
   type ToolMode,
@@ -289,12 +292,7 @@ export default function App() {
   const allocationSummary = useMemo(() => calculateAllocationSummary(activePlan), [activePlan]);
 
   function applyRange(dayIndex: number, startRow: number, len: number, activityIdOrNull: string | null) {
-    updateActivePlan((p) => {
-      const nextGrid = p.grid.map((col) => col.slice());
-      const end = Math.min(288, startRow + len);
-      for (let r = startRow; r < end; r++) nextGrid[dayIndex][r] = activityIdOrNull;
-      return { grid: nextGrid };
-    });
+    updateActivePlan((p) => ({ grid: updateGridRange(p.grid, dayIndex, startRow, len, activityIdOrNull) }));
   }
 
   function onCellPointerEnter(dayIndex: number, startRow: number) {
@@ -323,36 +321,28 @@ export default function App() {
   }
 
   function getStripeBackground(dayIndex: number, startRow: number) {
-    const ids = activePlan.grid?.[dayIndex]?.slice(startRow, startRow + viewStep) ?? [];
-    const counts = new Map<string, number>();
-    let free = 0;
+    const summary = summariseGroupedBlock(activePlan.grid, dayIndex, startRow, viewStep);
 
-    for (const id of ids) {
-      if (!id) free++;
-      else counts.set(id, (counts.get(id) ?? 0) + 1);
-    }
+    if (summary.kind === "free") return summary;
 
-    if (counts.size === 0) return { kind: "free" as const };
-
-    if (counts.size === 1 && free === 0) {
-      const onlyId = Array.from(counts.keys())[0];
-      const a = activityById.get(onlyId) ?? null;
+    if (summary.kind === "single") {
+      const a = activityById.get(summary.activityId) ?? null;
       return { kind: "single" as const, activity: a };
     }
 
-    const segments: { key: string; colour: string; n: number; label: string }[] = [];
-    for (const [id, n] of counts.entries()) {
-      const a = activityById.get(id);
-      segments.push({
-        key: id,
-        colour: a?.colour ?? "#A3A3A3",
-        n,
-        label: a?.name ?? "Unknown",
-      });
-    }
-    if (free > 0) segments.push({ key: "__free__", colour: "rgba(255,255,255,0.06)", n: free, label: "Free" });
+    const segments = summary.segments.map((segment) => {
+      if (segment.activityId === null) {
+        return { key: "__free__", colour: "rgba(255,255,255,0.06)", n: segment.cellCount, label: "Free" };
+      }
 
-    segments.sort((a, b) => b.n - a.n);
+      const a = activityById.get(segment.activityId);
+      return {
+        key: segment.activityId,
+        colour: a?.colour ?? "#A3A3A3",
+        n: segment.cellCount,
+        label: a?.name ?? "Unknown",
+      };
+    });
 
     const total = viewStep;
     let acc = 0;
@@ -1198,7 +1188,7 @@ export default function App() {
                   ))}
                 </div>
 
-                {Array.from({ length: 288 / viewStep }, (_, visIndex) => {
+                {Array.from({ length: CELLS_PER_DAY / viewStep }, (_, visIndex) => {
                   const startRow = visIndex * viewStep;
                   const showLabel = startRow % 12 === 0;
                   const time = timeLabelForRow(startRow);
@@ -1216,7 +1206,7 @@ export default function App() {
                         {showLabel ? time : ""}
                       </div>
 
-                      {Array.from({ length: 7 }, (_, dayIndex) => {
+                      {Array.from({ length: DAYS.length }, (_, dayIndex) => {
                         const cellInfo = getStripeBackground(dayIndex, startRow);
                         const isQuarterHour = startRow % 3 === 0;
                         const isHour = startRow % 12 === 0;
