@@ -143,6 +143,27 @@ Verified results after the change:
 - `npm run test` passes
 - `npm run build` passes
 
+## Completed planner domain extraction
+
+Allocation summary and plan operation extraction was completed on 16 July 2026.
+
+The change included:
+
+- moving allocation summaries for activity minutes, free minutes and the 10,080-minute week total from `src/App.tsx` into `src/domain/planner.ts`
+- moving pure plan operations for add, rename, duplicate and delete into `src/domain/planner.ts`
+- preserving modal state, validation, identifier generation, persistence and display concerns in `src/App.tsx`
+- adding focused Vitest coverage for allocation summaries, deterministic plan operations, missing plan identifiers and immutability
+
+Verified results after the change:
+
+- `npm ci` passes
+- `npm run lint` passes
+- `npm run test` passes with 49 tests
+- `npm run build` passes
+- `git diff --check` passes
+
+Browser manual checks were not performed because browser execution was unavailable in this environment.
+
 ## Completed preparation
 
 The following preparation has been completed:
@@ -242,7 +263,7 @@ The current key, `week_planner_5min_store_v3`, is tied to one schema version. It
 
 #### `App.tsx` has too many responsibilities
 
-The application is difficult to change safely because persistence, interactions and presentation are still combined. The first shared planner types and pure helpers have been extracted.
+The application is difficult to change safely because persistence, interactions, grouped-grid rendering and presentation are still combined. Shared planner types, allocation summaries and pure plan operations have been extracted.
 
 ### Medium priority
 
@@ -280,7 +301,7 @@ The repository does not currently state reuse or redistribution terms.
 
 The next implementation task should be:
 
-> Extract allocation summary and plan operation logic from `src/App.tsx` into tested domain helpers.
+> Extract grid range updates and grouped-block calculations from `src/App.tsx` into tested domain helpers.
 
 CI now detects pull-request regressions before merge and blocks GitHub Pages deployment when install, lint, test or build checks fail. The next safety improvement should continue reducing the size and responsibility of `src/App.tsx` without changing application behaviour, storage keys or the persisted schema.
 

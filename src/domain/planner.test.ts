@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  addPlanAndSelect,
   buildEmptyWeek,
+  calculateAllocationSummary,
   clearGridForActivity,
   formatMinutes,
   hexWithAlpha,
   iconLabel,
+  deletePlanAndSelectFallback,
+  duplicatePlanAndSelect,
   initialisePlannerState,
+  renamePlan,
   reorderByIndex,
   safeParseJSON,
   timeLabelForRow,
@@ -126,5 +131,155 @@ describe("planner storage initialisation", () => {
     expect(initialisePlannerState("not an object", defaultPlan)).toEqual({ plans: [defaultPlan], activePlanId: defaultPlan.id });
     expect(initialisePlannerState({ version: 3, plans: [] }, defaultPlan)).toEqual({ plans: [defaultPlan], activePlanId: defaultPlan.id });
     expect(initialisePlannerState({ version: 3, plans: "bad" }, defaultPlan)).toEqual({ plans: [defaultPlan], activePlanId: defaultPlan.id });
+  });
+});
+
+describe("allocation summaries", () => {
+  const makePlan = () => ({
+    id: "plan-1",
+    name: "Plan 1",
+    activities: [
+      { id: "activity-a", name: "Activity A", colour: "#000000", icon: "calendar" },
+      { id: "activity-b", name: "Activity B", colour: "#ffffff", icon: "book" },
+    ],
+    grid: buildEmptyWeek(),
+    selectedActivityId: "activity-a",
+    tool: "paint" as const,
+  });
+
+  it("reports an empty week as 10,080 free minutes", () => {
+    const summary = calculateAllocationSummary(makePlan());
+
+    expect(summary.freeMinutes).toBe(10080);
+    expect(summary.totalMinutes).toBe(10080);
+    expect(summary.minutesById.get("activity-a")).toBe(0);
+  });
+
+  it("counts allocations across more than one day", () => {
+    const plan = makePlan();
+    plan.grid[0][0] = "activity-a";
+    plan.grid[0][1] = "activity-a";
+    plan.grid[2][10] = "activity-a";
+
+    const summary = calculateAllocationSummary(plan);
+
+    expect(summary.minutesById.get("activity-a")).toBe(15);
+    expect(summary.freeMinutes).toBe(10065);
+  });
+
+  it("reports separate totals for multiple activities", () => {
+    const plan = makePlan();
+    plan.grid[1][0] = "activity-a";
+    plan.grid[1][1] = "activity-b";
+    plan.grid[1][2] = "activity-b";
+
+    const summary = calculateAllocationSummary(plan);
+
+    expect(summary.minutesById.get("activity-a")).toBe(5);
+    expect(summary.minutesById.get("activity-b")).toBe(10);
+  });
+
+  it("does not mutate the supplied plan", () => {
+    const plan = makePlan();
+    plan.grid[0][0] = "activity-a";
+    const before = JSON.stringify(plan);
+
+    calculateAllocationSummary(plan);
+
+    expect(JSON.stringify(plan)).toBe(before);
+  });
+});
+
+describe("plan operations", () => {
+  const makePlan = (id: string, name = id) => ({
+    id,
+    name,
+    activities: [{ id: `${id}-activity`, name: `${name} activity`, colour: "#000000", icon: "calendar" }],
+    grid: buildEmptyWeek(),
+    selectedActivityId: `${id}-activity`,
+    tool: "paint" as const,
+  });
+
+  it("adds a plan and selects it", () => {
+    const first = makePlan("first");
+    const added = makePlan("added");
+
+    expect(addPlanAndSelect({ plans: [first], activePlanId: first.id }, added)).toEqual({ plans: [first, added], activePlanId: added.id });
+  });
+
+  it("renames only the requested plan", () => {
+    const first = makePlan("first", "First");
+    const second = makePlan("second", "Second");
+
+    const state = renamePlan({ plans: [first, second], activePlanId: first.id }, second.id, "Renamed");
+
+    expect(state.plans.map((plan) => plan.name)).toEqual(["First", "Renamed"]);
+    expect(state.activePlanId).toBe(first.id);
+  });
+
+  it("duplicates a plan with the supplied identifier and name", () => {
+    const first = makePlan("first", "First");
+    first.grid[0][0] = first.activities[0].id;
+
+    const state = duplicatePlanAndSelect({ plans: [first], activePlanId: first.id }, first.id, "duplicate", "Duplicate");
+
+    expect(state.plans).toHaveLength(2);
+    expect(state.activePlanId).toBe("duplicate");
+    expect(state.plans[1]).toMatchObject({ id: "duplicate", name: "Duplicate", selectedActivityId: first.selectedActivityId, tool: first.tool });
+    expect(state.plans[1].activities).toEqual(first.activities);
+    expect(state.plans[1].grid).toEqual(first.grid);
+  });
+
+  it("creates independent duplicate grid and activity copies", () => {
+    const first = makePlan("first", "First");
+    const state = duplicatePlanAndSelect({ plans: [first], activePlanId: first.id }, first.id, "duplicate", "Duplicate");
+    const duplicate = state.plans[1];
+
+    duplicate.grid[0][0] = "changed";
+    duplicate.activities[0].name = "Changed";
+
+    expect(first.grid[0][0]).toBeNull();
+    expect(first.activities[0].name).toBe("First activity");
+  });
+
+  it("deletes the active plan and selects the first remaining plan", () => {
+    const first = makePlan("first");
+    const second = makePlan("second");
+    const third = makePlan("third");
+
+    expect(deletePlanAndSelectFallback({ plans: [first, second, third], activePlanId: second.id }, second.id)).toEqual({
+      plans: [first, third],
+      activePlanId: first.id,
+    });
+  });
+
+  it("prevents deletion of the final remaining plan", () => {
+    const first = makePlan("first");
+    const state = { plans: [first], activePlanId: first.id };
+
+    expect(deletePlanAndSelectFallback(state, first.id)).toBe(state);
+  });
+
+  it("handles missing requested plan identifiers safely", () => {
+    const first = makePlan("first");
+    const state = { plans: [first], activePlanId: first.id };
+
+    expect(renamePlan(state, "missing", "Ignored")).toBe(state);
+    expect(duplicatePlanAndSelect(state, "missing", "duplicate", "Duplicate")).toBe(state);
+    expect(deletePlanAndSelectFallback(state, "missing")).toBe(state);
+  });
+
+  it("does not mutate input state", () => {
+    const first = makePlan("first", "First");
+    const second = makePlan("second", "Second");
+    const state = { plans: [first, second], activePlanId: first.id };
+    const before = JSON.stringify(state);
+
+    addPlanAndSelect(state, makePlan("added"));
+    renamePlan(state, second.id, "Renamed");
+    duplicatePlanAndSelect(state, first.id, "duplicate", "Duplicate");
+    deletePlanAndSelectFallback(state, first.id);
+
+    expect(JSON.stringify(state)).toBe(before);
   });
 });
