@@ -408,17 +408,21 @@ base: "/week-planner/"
 
 This matches the GitHub Pages project path.
 
+Pull-request quality gates are defined in `.github/workflows/ci.yml`. The workflow runs for pull requests targeting `main` with read-only repository permissions. It checks out the repository, installs Node.js 20 with the npm cache enabled, installs locked dependencies with `npm ci`, then runs `npm run lint`, `npm run test` and `npm run build`. A failing command stops the workflow and reports the pull-request check as failed. It does not deploy anything.
+
 Deployment is defined in `.github/workflows/deploy-pages.yml`. The workflow:
 
 1. runs on pushes to `main` and manual dispatches
 2. checks out the repository
 3. installs Node.js 20 and enables the npm cache
 4. installs locked dependencies with `npm ci`
-5. runs `npm run build`
-6. uploads `dist` as a GitHub Pages artifact
-7. deploys the artifact to the `github-pages` environment
+5. runs `npm run lint`
+6. runs `npm run test`
+7. runs `npm run build`
+8. uploads `dist` as a GitHub Pages artifact
+9. deploys the artifact to the `github-pages` environment
 
-The workflow does not currently run linting or automated tests.
+Linting, automated tests and the production build all run before artifact upload. Any failure prevents the Pages artifact from being uploaded and stops deployment.
 
 During the baseline review, the live application rendered successfully and its generated JavaScript and CSS asset names matched the local production build exactly. This verifies that the reviewed source revision and live deployment produced the same build output.
 

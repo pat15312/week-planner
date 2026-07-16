@@ -122,6 +122,27 @@ Verified results after the change:
 - `npm run build` passes
 - `npm run lint` still ran and failed with six remaining pre-existing explicit-`any` errors in `src/App.tsx` at that time
 
+
+## Completed CI quality gates
+
+Pull-request and deployment quality gates were added on 16 July 2026.
+
+The change included:
+
+- adding a pull-request workflow for changes targeting `main`
+- running `npm ci`, `npm run lint`, `npm run test` and `npm run build` in the pull-request workflow
+- using Node.js 20 and the npm cache in the pull-request workflow to match deployment
+- keeping pull-request workflow permissions read-only
+- adding linting and tests before the production build, artifact upload and GitHub Pages deployment
+- preserving the existing deployment triggers, Pages permissions, concurrency, artifact path, environment and deployment actions
+
+Verified results after the change:
+
+- `npm ci` passes
+- `npm run lint` passes
+- `npm run test` passes
+- `npm run build` passes
+
 ## Completed preparation
 
 The following preparation has been completed:
@@ -225,14 +246,6 @@ The application is difficult to change safely because persistence, interactions 
 
 ### Medium priority
 
-#### Linting currently passes
-
-`npm run lint` passes after the data-safety change removed the remaining explicit `any` usage. The deployment workflow still does not run linting.
-
-#### Deployment has no test or lint gate
-
-The GitHub Pages workflow installs dependencies and builds the application, but it does not run linting or automated tests.
-
 #### Mobile interaction is not designed
 
 The fixed-width layout, mouse painting and right-click erase behaviour are desktop-oriented.
@@ -267,9 +280,9 @@ The repository does not currently state reuse or redistribution terms.
 
 The next implementation task should be:
 
-> Add test and lint gates to the GitHub Pages deployment workflow.
+> Extract allocation summary and plan operation logic from `src/App.tsx` into tested domain helpers.
 
-Storage and import validation are now hardened for the existing version 3 payload. The next safety improvement should prevent regressions by running the existing automated checks in CI before deployment.
+CI now blocks pull-request regressions and deployment regressions with install, lint, test and build checks. The next safety improvement should continue reducing the size and responsibility of `src/App.tsx` without changing application behaviour, storage keys or the persisted schema.
 
 ## Roadmap
 
