@@ -204,10 +204,12 @@ export default function App() {
       const rawBackup = localStorage.getItem(PRE_IMPORT_BACKUP_KEY);
       setCanRestorePreviousPlans(rawBackup !== null && parsePlannerPayloadJSON(rawBackup).ok);
     } catch {
+      const message = "Browser storage could not be read. Changes may not be saved.";
       setCanRestorePreviousPlans(false);
-      setStorageWarning("Browser storage could not be read. Changes may not be saved.");
+      if (startupRecovery) setRecoveryStatus({ type: "error", message });
+      else setStorageWarning(message);
     }
-  }, [importExportOpen]);
+  }, [importExportOpen, startupRecovery]);
 
   // Keep activePlanId valid
   useEffect(() => {
@@ -477,9 +479,11 @@ export default function App() {
   }
 
   function restorePreviousPlans() {
+    setRecoveryStatus(null);
     const restored = restoreBackup(localStorage);
     if (!restored.ok) {
-      setJsonStatus({ type: "error", message: restored.error.message });
+      if (startupRecovery) setRecoveryStatus({ type: "error", message: restored.error.message });
+      else setJsonStatus({ type: "error", message: restored.error.message });
       return;
     }
     setPlannerState({ plans: restored.value.plans, activePlanId: restored.value.activePlanId });
@@ -743,7 +747,13 @@ export default function App() {
           ) : null}
 
           <div className="mb-3 flex flex-wrap gap-2">
-            <button onClick={downloadRecoveredStorage} className="rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 hover:opacity-90">
+            <button
+              onClick={() => {
+                setRecoveryStatus(null);
+                downloadRecoveredStorage();
+              }}
+              className="rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 hover:opacity-90"
+            >
               Download original stored text
             </button>
             <button onClick={openRecoveryImport} className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800">
@@ -769,7 +779,13 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <button onClick={() => setResetConfirmation(true)} className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800">
+              <button
+                onClick={() => {
+                  setRecoveryStatus(null);
+                  setResetConfirmation(true);
+                }}
+                className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800"
+              >
                 I understand, reset Week Planner
               </button>
             )}
