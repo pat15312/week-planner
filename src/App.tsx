@@ -47,6 +47,7 @@ import {
 import {
   PRE_IMPORT_BACKUP_KEY,
   STORAGE_KEY,
+  applyRecoveryReplacement,
   applyValidatedImport,
   createPlannerPayload,
   loadStartupState,
@@ -127,8 +128,10 @@ export default function App() {
     startup.status === "recovery" ? { originalText: startup.originalText, error: startup.error } : null
   );
   const [storageWarning, setStorageWarning] = useState<string | null>(startup.warning);
+  const [autoPersistenceEnabled, setAutoPersistenceEnabled] = useState(startup.autoPersistenceEnabled);
   const [canRestorePreviousPlans, setCanRestorePreviousPlans] = useState(false);
   const [resetConfirmation, setResetConfirmation] = useState(false);
+  const [recoveryStatus, setRecoveryStatus] = useState<{ type: "ok" | "error"; message: string } | null>(null);
   const [{ plans, activePlanId }, setPlannerState] = useState(startup.state);
 
   const setPlans: React.Dispatch<React.SetStateAction<Plan[]>> = (value) => {
@@ -191,10 +194,10 @@ export default function App() {
 
   // Persist to storage
   useEffect(() => {
-    if (!plans || plans.length === 0 || startupRecovery) return;
+    if (!plans || plans.length === 0 || startupRecovery || !autoPersistenceEnabled) return;
     const saved = savePayload(localStorage, STORAGE_KEY, createPlannerPayload(plans, activePlanId));
     setStorageWarning(saved.ok ? null : "Changes are not being saved because browser storage is unavailable. Export your plans to keep a copy.");
-  }, [plans, activePlanId, startupRecovery]);
+  }, [plans, activePlanId, startupRecovery, autoPersistenceEnabled]);
 
   useEffect(() => {
     try {
@@ -433,7 +436,30 @@ export default function App() {
     setImportExportOpen(true);
   }
 
+  function openRecoveryImport() {
+    setJsonBuffer("");
+    setJsonStatus(null);
+    setRecoveryStatus(null);
+    setImportExportOpen(true);
+  }
+
   function applyImport() {
+    if (startupRecovery) {
+      const replacement = applyRecoveryReplacement(localStorage, jsonBuffer);
+      if (!replacement.ok) {
+        setJsonStatus({ type: "error", message: replacement.error.message });
+        return;
+      }
+      setPlannerState({ plans: replacement.value.plans, activePlanId: replacement.value.activePlanId });
+      setStartupRecovery(null);
+      setAutoPersistenceEnabled(true);
+      setResetConfirmation(false);
+      setRecoveryStatus(null);
+      setStorageWarning(null);
+      setJsonStatus({ type: "ok", message: "Replacement plans imported successfully." });
+      return;
+    }
+
     const currentPayload = createPlannerPayload(plans, activePlanId);
     const imported = applyValidatedImport(localStorage, currentPayload, jsonBuffer);
     if (!imported.ok) {
@@ -443,6 +469,7 @@ export default function App() {
 
     setPlannerState({ plans: imported.value.plans, activePlanId: imported.value.activePlanId });
     setStartupRecovery(null);
+    setAutoPersistenceEnabled(true);
     setResetConfirmation(false);
     setCanRestorePreviousPlans(true);
     setStorageWarning(null);
@@ -456,7 +483,10 @@ export default function App() {
       return;
     }
     setPlannerState({ plans: restored.value.plans, activePlanId: restored.value.activePlanId });
+    setStartupRecovery(null);
+    setAutoPersistenceEnabled(true);
     setCanRestorePreviousPlans(false);
+    setRecoveryStatus(null);
     setStorageWarning(null);
     setJsonStatus({ type: "ok", message: "Previous plans restored." });
     setJsonBuffer(JSON.stringify(restored.value, null, 2));
@@ -478,12 +508,14 @@ export default function App() {
     const payload = createPlannerPayload([defaultPlan], defaultPlan.id);
     const reset = resetAfterRecovery(localStorage, payload);
     if (!reset.ok) {
-      setJsonStatus({ type: "error", message: "Week Planner could not reset because browser storage could not be written." });
+      setRecoveryStatus({ type: "error", message: "Week Planner could not reset because browser storage could not be written." });
       return;
     }
     setPlannerState({ plans: payload.plans, activePlanId: payload.activePlanId });
     setStartupRecovery(null);
+    setAutoPersistenceEnabled(true);
     setResetConfirmation(false);
+    setRecoveryStatus(null);
     setStorageWarning(null);
   }
 
@@ -700,14 +732,28 @@ export default function App() {
             value.
           </p>
           <div className="mb-4 rounded-2xl bg-zinc-950 p-3 text-sm text-rose-100 ring-1 ring-rose-900/60">{startupRecovery.error}</div>
+          {recoveryStatus ? (
+            <div
+              className={`mb-4 rounded-2xl bg-zinc-950 p-3 text-sm ring-1 ${
+                recoveryStatus.type === "ok" ? "text-zinc-100 ring-zinc-700" : "text-rose-100 ring-rose-900/60"
+              }`}
+            >
+              {recoveryStatus.message}
+            </div>
+          ) : null}
 
           <div className="mb-3 flex flex-wrap gap-2">
             <button onClick={downloadRecoveredStorage} className="rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 hover:opacity-90">
               Download original stored text
             </button>
-            <button onClick={openExport} className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800">
+            <button onClick={openRecoveryImport} className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800">
               Supply replacement JSON
             </button>
+            {canRestorePreviousPlans ? (
+              <button onClick={restorePreviousPlans} className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800">
+                Restore previous plans
+              </button>
+            ) : null}
           </div>
 
           <div className="mt-5 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">

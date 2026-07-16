@@ -73,13 +73,15 @@ The change included:
 - adding a visible restore action for valid pre-import backups
 - entering recovery mode when browser-stored data is malformed, unsupported or structurally invalid
 - preserving invalid stored text exactly until the user imports a valid replacement or explicitly confirms a reset
+- disabling automatic persistence for the session when browser storage cannot be read at start-up
+- opening recovery replacement import with an empty field and without backing up the temporary default plan
 - warning when browser storage reads or writes fail
 - removing the remaining explicit `any` lint failures from `src/App.tsx`
 
 Verified results after the change:
 
 - `npm ci` passes
-- `npm run test` passes
+- `npm run test` passes with 37 tests
 - `npm run lint` passes
 - `npm run build` passes
 

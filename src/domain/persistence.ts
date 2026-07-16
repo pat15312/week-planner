@@ -29,7 +29,7 @@ export function validatePlannerPayloadV3(value: unknown): ValidationResult<Plann
   if (!isRecord(value)) return fail("The imported data must be a JSON object.");
   if (value.version !== PAYLOAD_VERSION) return fail("This data is not a supported Week Planner version 3 export.", "version");
   if (!Array.isArray(value.plans) || value.plans.length === 0) return fail("The data must include at least one plan.", "plans");
-  if (!(typeof value.activePlanId === "string" || value.activePlanId === null)) {
+  if ("activePlanId" in value && !(typeof value.activePlanId === "string" || value.activePlanId === null)) {
     return fail("The active plan identifier must be text or null.", "activePlanId");
   }
 
@@ -102,22 +102,22 @@ export function createPlannerPayload(plans: Plan[], activePlanId: string | null)
 
 export type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 export type StartupResult =
-  | { status: "ready"; state: PlannerState; warning: string | null }
-  | { status: "recovery"; originalText: string; error: string; state: PlannerState; warning: string | null };
+  | { status: "ready"; state: PlannerState; warning: string | null; autoPersistenceEnabled: boolean }
+  | { status: "recovery"; originalText: string; error: string; state: PlannerState; warning: string | null; autoPersistenceEnabled: boolean };
 
 export function loadStartupState(storage: StorageLike, defaultPlan: Plan): StartupResult {
   let raw: string | null;
   try {
     raw = storage.getItem(STORAGE_KEY);
   } catch {
-    return { status: "ready", state: { plans: [defaultPlan], activePlanId: defaultPlan.id }, warning: "Browser storage could not be read. Changes may not be saved." };
+    return { status: "ready", state: { plans: [defaultPlan], activePlanId: defaultPlan.id }, warning: "Browser storage could not be read. Changes may not be saved.", autoPersistenceEnabled: false };
   }
-  if (raw === null) return { status: "ready", state: { plans: [defaultPlan], activePlanId: defaultPlan.id }, warning: null };
+  if (raw === null) return { status: "ready", state: { plans: [defaultPlan], activePlanId: defaultPlan.id }, warning: null, autoPersistenceEnabled: true };
   const validated = parsePlannerPayloadJSON(raw);
   if (!validated.ok) {
-    return { status: "recovery", originalText: raw, error: validated.error.message, state: { plans: [defaultPlan], activePlanId: defaultPlan.id }, warning: null };
+    return { status: "recovery", originalText: raw, error: validated.error.message, state: { plans: [defaultPlan], activePlanId: defaultPlan.id }, warning: null, autoPersistenceEnabled: false };
   }
-  return { status: "ready", state: { plans: validated.value.plans, activePlanId: validated.value.activePlanId }, warning: null };
+  return { status: "ready", state: { plans: validated.value.plans, activePlanId: validated.value.activePlanId }, warning: null, autoPersistenceEnabled: true };
 }
 
 export function savePayload(storage: StorageLike, key: string, payload: PlannerPayloadV3): ValidationResult<void> {
@@ -139,6 +139,14 @@ export function applyValidatedImport(storage: StorageLike, currentPayload: Plann
   const saved = savePayload(storage, STORAGE_KEY, imported.value);
   if (!saved.ok) return fail("The import was cancelled because Week Planner could not save the imported plans.");
   return imported;
+}
+
+export function applyRecoveryReplacement(storage: StorageLike, replacementText: string): ValidationResult<PlannerPayloadV3> {
+  const replacement = parsePlannerPayloadJSON(replacementText);
+  if (!replacement.ok) return replacement;
+  const saved = savePayload(storage, STORAGE_KEY, replacement.value);
+  if (!saved.ok) return fail("The replacement plans were valid, but Week Planner could not save them.");
+  return replacement;
 }
 
 export function restoreBackup(storage: StorageLike): ValidationResult<PlannerPayloadV3> {

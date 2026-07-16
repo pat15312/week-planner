@@ -3,6 +3,7 @@ import { buildEmptyWeek, makeDefaultPlan, type Plan } from "./planner";
 import {
   PRE_IMPORT_BACKUP_KEY,
   STORAGE_KEY,
+  applyRecoveryReplacement,
   applyValidatedImport,
   createPlannerPayload,
   loadStartupState,
@@ -55,9 +56,13 @@ describe("validatePlannerPayloadV3", () => {
     if (result.ok) expect(result.value.activePlanId).toBe("plan-two");
   });
 
-  it("falls back to the first plan when the active plan is missing or unmatched", () => {
+  it("falls back to the first plan when the active plan is omitted, null or unmatched", () => {
+    const omittedPayload = validPayload() as Partial<PlannerPayloadV3>;
+    delete omittedPayload.activePlanId;
+    const omitted = validatePlannerPayloadV3(omittedPayload);
     const missing = validatePlannerPayloadV3({ ...validPayload(), activePlanId: null });
     const unmatched = validatePlannerPayloadV3({ ...validPayload(), activePlanId: "missing" });
+    expect(omitted.ok && omitted.value.activePlanId).toBe("plan-one");
     expect(missing.ok && missing.value.activePlanId).toBe("plan-one");
     expect(unmatched.ok && unmatched.value.activePlanId).toBe("plan-one");
   });
@@ -190,5 +195,37 @@ describe("storage safety operations", () => {
   it("storage read and write failures produce safe outcomes", () => {
     expect(loadStartupState(memoryStorage({ failRead: true }), makeDefaultPlan("Default")).warning).toContain("could not be read");
     expect(applyValidatedImport(memoryStorage({ failWrite: true }), validPayload(), JSON.stringify(validPayload())).ok).toBe(false);
+  });
+
+  it("storage read failure disables automatic persistence even when writes would succeed", () => {
+    const storage = memoryStorage({ failRead: true });
+    const result = loadStartupState(storage, makeDefaultPlan("Default"));
+    expect(result.autoPersistenceEnabled).toBe(false);
+    expect(storage.values.has(STORAGE_KEY)).toBe(false);
+  });
+
+  it("invalid recovery replacement data leaves the original main stored text unchanged", () => {
+    const storage = memoryStorage();
+    storage.setItem(STORAGE_KEY, "not json");
+    const result = applyRecoveryReplacement(storage, "{");
+    expect(result.ok).toBe(false);
+    expect(storage.values.get(STORAGE_KEY)).toBe("not json");
+  });
+
+  it("valid recovery replacement data is written without backing up the temporary default plan", () => {
+    const storage = memoryStorage();
+    storage.setItem(STORAGE_KEY, "not json");
+    const result = applyRecoveryReplacement(storage, JSON.stringify(validPayload()));
+    expect(result.ok).toBe(true);
+    expect(parsePlannerPayloadJSON(storage.values.get(STORAGE_KEY) ?? "").ok).toBe(true);
+    expect(storage.values.has(PRE_IMPORT_BACKUP_KEY)).toBe(false);
+  });
+
+  it("recovery replacement does not create a misleading restore option from temporary data", () => {
+    const storage = memoryStorage();
+    const defaultPayload = createPlannerPayload([makePlan("temporary", "Temporary")], "temporary");
+    const result = applyRecoveryReplacement(storage, JSON.stringify(validPayload()));
+    expect(result.ok).toBe(true);
+    expect(storage.values.get(PRE_IMPORT_BACKUP_KEY)).not.toBe(JSON.stringify(defaultPayload));
   });
 });

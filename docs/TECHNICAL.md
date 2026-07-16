@@ -156,7 +156,7 @@ The stored payload is:
 }
 ```
 
-The application writes the full payload whenever plans or the active plan change, unless start-up has detected invalid stored data and the application is in recovery mode. Normal automatic persistence verifies the write by reading the value back. A failed save keeps the application usable and shows a persistent warning that changes are not being saved.
+The application writes the full payload whenever plans or the active plan change, unless start-up has detected invalid stored data, or browser storage could not be read at start-up. Normal automatic persistence verifies the write by reading the value back. A failed save keeps the application usable and shows a persistent warning that changes are not being saved.
 
 ### Version 3 validation boundary
 
@@ -176,8 +176,9 @@ Start-up behaviour is now:
 - valid stored data with a missing or unmatched `activePlanId` falls back deliberately to the first stored plan
 - absent stored data creates and selects the normal default plan
 - malformed, unsupported or structurally invalid stored data enters a recovery state before normal editing begins
+- storage read failure starts from a temporary default plan with automatic persistence disabled for that session, so unknown existing stored data is not overwritten
 
-Recovery mode preserves the original stored text exactly and prevents automatic persistence from overwriting it. The user can download the preserved text, import a valid replacement JSON payload, or explicitly reset Week Planner to a new default plan. Resetting requires confirmation and is the only recovery action that intentionally replaces the invalid main stored value with a default payload.
+Recovery mode preserves the original stored text exactly and prevents automatic persistence from overwriting it. The user can download the preserved text, open an empty replacement-import field, import a valid replacement JSON payload, restore a valid pre-import backup when one exists, or explicitly reset Week Planner to a new default plan. Invalid replacement JSON stays in the field for correction. A valid replacement import writes the replacement directly to the main key without creating a backup from the temporary default plan. Resetting requires confirmation and is the only recovery action that intentionally replaces the invalid main stored value with a default payload.
 
 ### Import, backup and restore
 
