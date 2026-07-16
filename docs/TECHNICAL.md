@@ -157,27 +157,17 @@ The stored payload is shaped approximately as:
 
 The application writes the full payload whenever plans or the active plan change.
 
-### Start-up ordering and active-plan bug
+### Start-up ordering and active-plan restoration
 
-The current application uses separate effects to:
+The application initialises `plans` and `activePlanId` together before the first render by reading the version 3 payload from `localStorage` and passing it through the shared `initialisePlannerState` helper.
 
-1. read saved data
-2. persist the current state
-3. keep the active plan identifier valid
+Start-up behaviour is now:
 
-All three effects run after the first render, which begins with a newly created default plan. This creates competing initialisation updates.
+- valid stored data with an `activePlanId` matching an existing plan restores that plan, even when it is not the first plan
+- valid stored data with a missing or unmatched `activePlanId` falls back deliberately to the first stored plan
+- absent or malformed stored data creates and selects the normal default plan
 
-The baseline review confirmed that:
-
-- saved plans survive a reload
-- the stored active plan does not
-- after selecting a second plan and reloading, the application returns to the first plan
-
-The application must restore the previously active plan after reload. The current behaviour is a confirmed bug, not an open product decision.
-
-The persistence effect also writes the initial default state before the saved state has fully settled. With valid test data, plan content was restored successfully. However, the ordering creates an unnecessary overwrite risk, particularly if stored data is malformed or rendering fails before the validated value is safely re-persisted.
-
-A future fix should load and validate storage before enabling automatic writes, then restore a valid saved active plan or fall back deliberately to the first valid plan.
+Automatic persistence still writes the full version 3 payload whenever plans or the active plan change, but it now starts from the already-initialised state rather than from a temporary default state followed by a storage-loading effect. This protects valid stored plans from being overwritten by the temporary default state during start-up.
 
 ### Storage-reader validation
 

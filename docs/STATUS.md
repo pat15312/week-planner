@@ -58,6 +58,25 @@ Verified results:
 
 Detailed technical findings belong in [TECHNICAL.md](TECHNICAL.md).
 
+## Completed active-plan restoration fix
+
+The active-plan restoration bug was fixed on 16 July 2026.
+
+The change included:
+
+- initialising stored plans and the active plan identifier together before automatic persistence begins
+- restoring a valid stored active plan after reload
+- deliberately falling back to the first stored plan when the stored active plan is missing or invalid
+- keeping absent or malformed storage on the normal default-plan path
+- adding Vitest coverage for the storage initialisation helper
+
+Verified results after the change:
+
+- `npm ci` passes
+- `npm run test` passes
+- `npm run build` passes
+- `npm run lint` still runs but fails with five remaining pre-existing explicit-`any` errors in `src/App.tsx`
+
 ## Completed test foundation
 
 The initial unit-test foundation was completed on 16 July 2026.
@@ -118,13 +137,7 @@ With the test setup in place, extract pure logic from `App.tsx`, including:
 
 This stage should not alter the product's appearance, storage key, persisted schema or established planner behaviour.
 
-### 3. Fix active-plan restoration
-
-After a test protects the intended behaviour, correct start-up ordering so the previously active valid plan is restored after reload.
-
-This should be a small, explicit bug fix rather than an incidental side effect of refactoring.
-
-### 4. Harden storage and import
+### 3. Harden storage and import
 
 After the domain and persistence boundaries are testable:
 
@@ -137,7 +150,7 @@ After the domain and persistence boundaries are testable:
 
 Do not add version 1 or version 2 migration code unless real historical data is identified.
 
-### 5. Split the interface into coherent components
+### 4. Split the interface into coherent components
 
 After tests protect behaviour, separate:
 
@@ -152,7 +165,7 @@ After tests protect behaviour, separate:
 
 Avoid a rewrite. Use incremental extraction.
 
-### 6. Design mobile and touch behaviour
+### 5. Design mobile and touch behaviour
 
 Treat mobile usability as a product-design task, not only a responsive CSS task.
 
@@ -167,7 +180,7 @@ Decisions are needed for:
 - tablet layouts
 - keyboard and accessibility support
 
-### 7. Consider product enhancements
+### 6. Consider product enhancements
 
 Only after the foundation is stable should new features be prioritised.
 
@@ -176,14 +189,6 @@ New features must support intentional weekly allocation and should not turn the 
 ## Known issues and risks
 
 ### High priority
-
-#### Active plan is not restored
-
-Saved plans survive reload, but the application returns to the first plan rather than restoring the stored active plan.
-
-#### Start-up persistence ordering is unsafe
-
-Automatic persistence begins before saved state has fully loaded and been validated.
 
 #### Saved data has insufficient validation
 
@@ -245,9 +250,9 @@ The repository does not currently state reuse or redistribution terms.
 
 The next implementation task should be:
 
-> Fix active-plan restoration with a small, explicit unit-tested change.
+> Harden storage and import while preserving the current storage key and version 3 payload.
 
-The initial unit-test foundation is now in place. The active-plan restoration bug should be fixed as a separate increment rather than hidden inside further refactoring.
+The active-plan restoration bug is resolved. The next safety improvement should validate persisted data more fully, isolate browser persistence further from rendering, and add recovery around destructive imports without changing the storage key or schema casually.
 
 ## Roadmap
 

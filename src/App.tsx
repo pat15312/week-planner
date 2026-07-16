@@ -35,6 +35,7 @@ import {
   formatMinutes,
   hexWithAlpha,
   iconLabel,
+  initialisePlannerState,
   makeDefaultPlan,
   reorderByIndex,
   safeParseJSON,
@@ -114,8 +115,27 @@ function getIconComponent(iconKey: string) {
 type PlanModalMode = "new" | "rename" | "duplicate" | "delete";
 
 export default function App() {
-  const [plans, setPlans] = useState<Plan[]>(() => [makeDefaultPlan("Default")]);
-  const [activePlanId, setActivePlanId] = useState<string | null>(() => null);
+  const [{ plans, activePlanId }, setPlannerState] = useState(() => {
+    const defaultPlan = makeDefaultPlan("Default");
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? safeParseJSON(raw) : null;
+
+    return initialisePlannerState(parsed?.ok ? parsed.value : null, defaultPlan);
+  });
+
+  const setPlans: React.Dispatch<React.SetStateAction<Plan[]>> = (value) => {
+    setPlannerState((prev) => ({
+      ...prev,
+      plans: typeof value === "function" ? value(prev.plans) : value,
+    }));
+  };
+
+  const setActivePlanId: React.Dispatch<React.SetStateAction<string | null>> = (value) => {
+    setPlannerState((prev) => ({
+      ...prev,
+      activePlanId: typeof value === "function" ? value(prev.activePlanId) : value,
+    }));
+  };
 
   const [importExportOpen, setImportExportOpen] = useState(false);
   const [jsonBuffer, setJsonBuffer] = useState("");
@@ -160,25 +180,6 @@ export default function App() {
   >(null);
 
   const activePlan = useMemo<Plan>(() => plans.find((p) => p.id === activePlanId) ?? plans[0], [plans, activePlanId]);
-
-  // Initial load from storage (V3 only)
-  useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = safeParseJSON(raw);
-      if (parsed.ok && parsed.value && typeof parsed.value === "object") {
-        const v: any = parsed.value;
-        if (Array.isArray(v.plans) && v.plans.length > 0) {
-          setPlans(v.plans);
-          setActivePlanId(typeof v.activePlanId === "string" ? v.activePlanId : v.plans[0].id);
-          return;
-        }
-      }
-    }
-
-    setActivePlanId((prev) => prev ?? plans[0]?.id ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Persist to storage
   useEffect(() => {
