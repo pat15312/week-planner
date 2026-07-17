@@ -176,6 +176,10 @@ export default function App() {
   const [activitiesDrawerOpen, setActivitiesDrawerOpen] = useState(false);
   const activitiesDrawerCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const activitiesDrawerOpenButtonRef = useRef<HTMLButtonElement | null>(null);
+  const activitiesDrawerRef = useRef<HTMLDivElement | null>(null);
+  const plannerAppRef = useRef<HTMLDivElement | null>(null);
+  const activityDrawerPreviousFocusRef = useRef<HTMLElement | null>(null);
+  const activityDrawerWasOpenRef = useRef(false);
   const [narrowDayWindowStart, setNarrowDayWindowStart] = useState(0);
 
   // Grid view scale
@@ -208,6 +212,76 @@ export default function App() {
   >(null);
 
   const activePlan = useMemo<Plan>(() => plans.find((p) => p.id === activePlanId) ?? plans[0], [plans, activePlanId]);
+
+  function getDrawerFocusableElements() {
+    const drawer = activitiesDrawerRef.current;
+    if (!drawer) return [];
+
+    const selectors = [
+      "a[href]",
+      "button:not([disabled])",
+      "textarea:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      '[tabindex]:not([tabindex="-1"])',
+    ];
+
+    return Array.from(drawer.querySelectorAll<HTMLElement>(selectors.join(","))).filter((element) => {
+      if (element.hasAttribute("disabled") || element.getAttribute("aria-hidden") === "true") return false;
+      return element.offsetParent !== null || element === document.activeElement;
+    });
+  }
+
+  function restoreActivitiesDrawerFocus() {
+    const previousFocus = activityDrawerPreviousFocusRef.current;
+    activityDrawerPreviousFocusRef.current = null;
+
+    if (previousFocus?.isConnected && previousFocus.offsetParent !== null) {
+      previousFocus.focus();
+      return;
+    }
+
+    const openButton = activitiesDrawerOpenButtonRef.current;
+    if (openButton?.isConnected && openButton.offsetParent !== null) openButton.focus();
+  }
+
+  function openActivitiesDrawer() {
+    const activeElement = document.activeElement;
+    activityDrawerPreviousFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+    setActivitiesDrawerOpen(true);
+  }
+
+  function closeActivitiesDrawer() {
+    setActivitiesDrawerOpen(false);
+  }
+
+  function onActivitiesDrawerKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== "Tab") return;
+
+    const focusableElements = getDrawerFocusableElements();
+    if (focusableElements.length === 0) {
+      e.preventDefault();
+      activitiesDrawerCloseButtonRef.current?.focus();
+      return;
+    }
+
+    const first = focusableElements[0];
+    const last = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+
+    if (e.shiftKey) {
+      if (activeElement === first || !activitiesDrawerRef.current?.contains(activeElement)) {
+        e.preventDefault();
+        last.focus();
+      }
+      return;
+    }
+
+    if (activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 
   // Persist to storage
   useEffect(() => {
@@ -268,18 +342,32 @@ export default function App() {
       if (e.key !== "Escape") return;
       setPlanModalOpen(false);
       setImportExportOpen(false);
-      setActivitiesDrawerOpen(false);
+      closeActivitiesDrawer();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [planModalOpen, importExportOpen, activitiesDrawerOpen]);
 
   useEffect(() => {
-    if (activitiesDrawerOpen) {
-      activitiesDrawerCloseButtonRef.current?.focus();
+    const background = plannerAppRef.current;
+
+    if (!activitiesDrawerOpen) {
+      if (activityDrawerWasOpenRef.current) {
+        activityDrawerWasOpenRef.current = false;
+        background?.removeAttribute("inert");
+        restoreActivitiesDrawerFocus();
+      }
       return;
     }
-    activitiesDrawerOpenButtonRef.current?.focus();
+
+    activityDrawerWasOpenRef.current = true;
+    background?.setAttribute("inert", "");
+    const focusFrame = window.requestAnimationFrame(() => activitiesDrawerCloseButtonRef.current?.focus());
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      background?.removeAttribute("inert");
+    };
   }, [activitiesDrawerOpen]);
 
   // When switching plan, collapse any open activity editors
@@ -1118,19 +1206,30 @@ export default function App() {
         </aside>
 
         {activitiesDrawerOpen ? (
-          <div className="fixed inset-0 z-40 xl:hidden" aria-modal="true" role="dialog" aria-label="Activities drawer">
+          <div
+            className="fixed inset-0 z-40 xl:hidden"
+            aria-modal="true"
+            role="dialog"
+            aria-label="Activities drawer"
+            onKeyDown={onActivitiesDrawerKeyDown}
+          >
             <button
               type="button"
+              tabIndex={-1}
               className="absolute inset-0 h-full w-full bg-black/70"
               aria-label="Close activities drawer"
-              onClick={() => setActivitiesDrawerOpen(false)}
+              onClick={closeActivitiesDrawer}
             />
-            <div id="activities-drawer" className="absolute inset-y-0 left-0 flex w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden bg-zinc-900 p-2 shadow-2xl ring-1 ring-zinc-800">
+            <div
+              ref={activitiesDrawerRef}
+              id="activities-drawer"
+              className="absolute inset-y-0 left-0 flex w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden bg-zinc-900 p-2 shadow-2xl ring-1 ring-zinc-800"
+            >
               <div className="mb-2 flex shrink-0 justify-end">
                 <button
                   ref={activitiesDrawerCloseButtonRef}
                   type="button"
-                  onClick={() => setActivitiesDrawerOpen(false)}
+                  onClick={closeActivitiesDrawer}
                   className="flex items-center gap-2 rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800"
                 >
                   <X className="h-4 w-4" />
@@ -1142,7 +1241,7 @@ export default function App() {
           </div>
         ) : null}
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden p-1">
+        <div ref={plannerAppRef} className="flex min-w-0 flex-1 flex-col overflow-hidden p-1">
           <div className="mb-3 flex shrink-0 flex-col items-center text-center">
             <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
             <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
@@ -1158,7 +1257,7 @@ export default function App() {
               <button
                 ref={activitiesDrawerOpenButtonRef}
                 type="button"
-                onClick={() => setActivitiesDrawerOpen(true)}
+                onClick={openActivitiesDrawer}
                 aria-expanded={activitiesDrawerOpen}
                 aria-controls="activities-drawer"
                 className="flex items-center gap-2 rounded-xl bg-zinc-100 px-3 py-2 text-zinc-950 ring-1 ring-zinc-200"

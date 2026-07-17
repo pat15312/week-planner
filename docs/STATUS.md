@@ -253,7 +253,7 @@ Further evidence is needed for:
 
 - real-device comfort across supported narrow sizes
 - touch target size and density
-- activity drawer focus behaviour
+- activity drawer behaviour on real devices
 - touch activity reordering
 - undo and recovery
 - tablet layouts
@@ -456,10 +456,10 @@ Verified results after the change:
 - `npm run test` passes with 74 tests
 - `npm run build` passes
 
-Manual browser checks are still recommended at 375, 390, 430, 768 and 1440 CSS pixels before treating the mobile experience as complete. Remaining mobile risks include real-device touch feel, focus trapping inside the drawer, small-screen density, discoverability of vertical scrolling and activity reordering ergonomics inside the drawer.
+Manual browser checks are still recommended at 375, 390, 430, 768 and 1440 CSS pixels before treating the mobile experience as complete. Remaining mobile risks include real-device touch feel, small-screen density, discoverability of vertical scrolling and activity reordering ergonomics inside the drawer.
 
 ## Recommended next Codex task
 
 The next small implementation task should be:
 
-> Manually verify and refine the responsive planner slice on real or emulated narrow viewports, with emphasis on drawer focus behaviour, scrolling comfort, touch target sizes and activity reordering on touch devices.
+> Manually verify and refine the responsive planner slice on real or emulated narrow viewports, with emphasis on scrolling comfort, touch target sizes and activity reordering on touch devices.
