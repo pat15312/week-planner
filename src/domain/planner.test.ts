@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   addPlanAndSelect,
   buildEmptyWeek,
+  clampNarrowDayWindowStart,
+  MAX_NARROW_DAY_WINDOW_START,
+  moveNarrowDayWindow,
+  narrowDayWindowIndices,
   calculateAllocationSummary,
   CELLS_PER_DAY,
   clearGridForActivity,
@@ -358,6 +362,36 @@ describe("plan operations", () => {
     deletePlanAndSelectFallback(state, first.id);
 
     expect(JSON.stringify(state)).toBe(before);
+  });
+});
+
+describe("narrow day windows", () => {
+  it("returns the five valid overlapping three-day windows", () => {
+    expect(Array.from({ length: MAX_NARROW_DAY_WINDOW_START + 1 }, (_, start) => narrowDayWindowIndices(start))).toEqual([
+      [0, 1, 2],
+      [1, 2, 3],
+      [2, 3, 4],
+      [3, 4, 5],
+      [4, 5, 6],
+    ]);
+  });
+
+  it("moves previous and next by one day", () => {
+    expect(moveNarrowDayWindow(2, -1)).toBe(1);
+    expect(moveNarrowDayWindow(2, 1)).toBe(3);
+  });
+
+  it("clamps movement at both ends", () => {
+    expect(moveNarrowDayWindow(0, -1)).toBe(0);
+    expect(moveNarrowDayWindow(MAX_NARROW_DAY_WINDOW_START, 1)).toBe(MAX_NARROW_DAY_WINDOW_START);
+  });
+
+  it("clamps invalid requested starts before deriving underlying day indices", () => {
+    expect(clampNarrowDayWindowStart(-10)).toBe(0);
+    expect(clampNarrowDayWindowStart(99)).toBe(4);
+    expect(clampNarrowDayWindowStart(2.8)).toBe(2);
+    expect(clampNarrowDayWindowStart(Number.NaN)).toBe(0);
+    expect(narrowDayWindowIndices(99)).toEqual([4, 5, 6]);
   });
 });
 

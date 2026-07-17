@@ -28,6 +28,7 @@ import {
   ChevronUp,
   X,
   Trash2,
+  Menu,
 } from "lucide-react";
 import {
   addPlanAndSelect,
@@ -40,6 +41,8 @@ import {
   deletePlanAndSelectFallback,
   duplicatePlanAndSelect,
   makeDefaultPlan,
+  moveNarrowDayWindow,
+  narrowDayWindowIndices,
   renamePlan,
   reorderByIndex,
   summariseGroupedBlock,
@@ -75,8 +78,10 @@ import {
 // - Activity customisation (name, colour, icon)
 // - Pointer-based drag-to-reorder activities
 // - Right click ALWAYS erases
+// - Narrow screens below Tailwind xl (1280 CSS pixels) show a three-day window
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const TOUCH_TAP_MOVE_THRESHOLD_PX = 10;
 
 const PRESET_COLOURS = [
   "#E11D48",
@@ -168,6 +173,10 @@ export default function App() {
   const [expandedActivityId, setExpandedActivityId] = useState<string | null>(null);
   const [pendingDeleteActivityId, setPendingDeleteActivityId] = useState<string | null>(null);
   const [pendingClearActivityId, setPendingClearActivityId] = useState<string | null>(null);
+  const [activitiesDrawerOpen, setActivitiesDrawerOpen] = useState(false);
+  const activitiesDrawerCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const activitiesDrawerOpenButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [narrowDayWindowStart, setNarrowDayWindowStart] = useState(0);
 
   // Grid view scale
   const [timeScale, setTimeScale] = useState<"5" | "15" | "60">("5");
@@ -177,6 +186,7 @@ export default function App() {
   const isMouseDownRef = useRef(false);
   const dragPaintModeRef = useRef<ToolMode>("paint");
   const lastPaintRef = useRef<{ day: number | null; row: number | null }>({ day: null, row: null });
+  const pendingTouchEditRef = useRef<{ pointerId: number; dayIndex: number; startRow: number; startX: number; startY: number; cancelled: boolean } | null>(null);
 
   // Pointer-based activity reordering
   const activityRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -251,17 +261,26 @@ export default function App() {
     return () => window.removeEventListener("mousedown", onDown);
   }, []);
 
-  // Escape closes modals
+  // Escape closes modals and the narrow activities drawer
   useEffect(() => {
-    if (!planModalOpen && !importExportOpen) return;
+    if (!planModalOpen && !importExportOpen && !activitiesDrawerOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       setPlanModalOpen(false);
       setImportExportOpen(false);
+      setActivitiesDrawerOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [planModalOpen, importExportOpen]);
+  }, [planModalOpen, importExportOpen, activitiesDrawerOpen]);
+
+  useEffect(() => {
+    if (activitiesDrawerOpen) {
+      activitiesDrawerCloseButtonRef.current?.focus();
+      return;
+    }
+    activitiesDrawerOpenButtonRef.current?.focus();
+  }, [activitiesDrawerOpen]);
 
   // When switching plan, collapse any open activity editors
   useEffect(() => {
@@ -290,34 +309,62 @@ export default function App() {
   }, [activePlan.activities]);
 
   const allocationSummary = useMemo(() => calculateAllocationSummary(activePlan), [activePlan]);
+  const visibleNarrowDayIndices = useMemo(() => narrowDayWindowIndices(narrowDayWindowStart), [narrowDayWindowStart]);
+  const visibleNarrowDaySet = useMemo(() => new Set(visibleNarrowDayIndices), [visibleNarrowDayIndices]);
+  const visibleDayRangeLabel = `${DAYS[visibleNarrowDayIndices[0]]}–${DAYS[visibleNarrowDayIndices[visibleNarrowDayIndices.length - 1]]}`;
+  const selectedActivity = activePlan.activities.find((activity) => activity.id === activePlan.selectedActivityId) ?? null;
 
   function applyRange(dayIndex: number, startRow: number, len: number, activityIdOrNull: string | null) {
     updateActivePlan((p) => ({ grid: updateGridRange(p.grid, dayIndex, startRow, len, activityIdOrNull) }));
   }
 
-  function onCellPointerEnter(dayIndex: number, startRow: number) {
-    if (!isMouseDownRef.current) return;
-    const last = lastPaintRef.current;
-    if (last.day === dayIndex && last.row === startRow) return;
-    lastPaintRef.current = { day: dayIndex, row: startRow };
-
-    const mode = dragPaintModeRef.current || "paint";
+  function applyActiveToolOnce(dayIndex: number, startRow: number, forcedMode?: ToolMode) {
+    const mode = forcedMode ?? activePlan.tool;
     if (mode === "erase") applyRange(dayIndex, startRow, viewStep, null);
     else applyRange(dayIndex, startRow, viewStep, activePlan.selectedActivityId ?? null);
   }
 
-  function onCellPointerDown(e: React.MouseEvent, dayIndex: number, startRow: number) {
-    e.preventDefault();
+  function onCellPointerEnter(e: React.PointerEvent, dayIndex: number, startRow: number) {
+    if (e.pointerType !== "mouse" || !isMouseDownRef.current) return;
+    const last = lastPaintRef.current;
+    if (last.day === dayIndex && last.row === startRow) return;
+    lastPaintRef.current = { day: dayIndex, row: startRow };
+    applyActiveToolOnce(dayIndex, startRow, dragPaintModeRef.current || "paint");
+  }
 
+  function onCellPointerDown(e: React.PointerEvent, dayIndex: number, startRow: number) {
+    if (e.pointerType === "touch" || e.pointerType === "pen") {
+      if (e.button !== 0) return;
+      pendingTouchEditRef.current = { pointerId: e.pointerId, dayIndex, startRow, startX: e.clientX, startY: e.clientY, cancelled: false };
+      return;
+    }
+
+    e.preventDefault();
     const buttons = e.buttons;
     const isRightClick = e.button === 2 || (buttons & 2) === 2;
 
     isMouseDownRef.current = true;
     lastPaintRef.current = { day: dayIndex, row: startRow };
     dragPaintModeRef.current = isRightClick ? "erase" : activePlan.tool;
+    applyActiveToolOnce(dayIndex, startRow, dragPaintModeRef.current);
+  }
 
-    if (dragPaintModeRef.current === "erase") applyRange(dayIndex, startRow, viewStep, null);
-    else applyRange(dayIndex, startRow, viewStep, activePlan.selectedActivityId ?? null);
+  function onCellPointerMove(e: React.PointerEvent) {
+    const pending = pendingTouchEditRef.current;
+    if (!pending || pending.pointerId !== e.pointerId) return;
+    if (Math.hypot(e.clientX - pending.startX, e.clientY - pending.startY) > TOUCH_TAP_MOVE_THRESHOLD_PX) pending.cancelled = true;
+  }
+
+  function onCellPointerUp(e: React.PointerEvent) {
+    const pending = pendingTouchEditRef.current;
+    if (!pending || pending.pointerId !== e.pointerId) return;
+    pendingTouchEditRef.current = null;
+    if (!pending.cancelled) applyActiveToolOnce(pending.dayIndex, pending.startRow);
+  }
+
+  function onCellPointerCancel(e: React.PointerEvent) {
+    const pending = pendingTouchEditRef.current;
+    if (pending?.pointerId === e.pointerId) pendingTouchEditRef.current = null;
   }
 
   function getStripeBackground(dayIndex: number, startRow: number) {
@@ -782,10 +829,9 @@ export default function App() {
     );
   }
 
-  return (
-    <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
-      <div className="mx-auto flex h-full max-w-[1400px] gap-4 p-4">
-        <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
+  function renderActivitiesPanel() {
+    return (
+      <>
           <div className="m-2 mb-4 shrink-0 rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
             <div className="flex items-center justify-between">
               <span className="text-zinc-300">Free time</span>
@@ -1060,9 +1106,43 @@ export default function App() {
                 );
               })}
             </div>
-          </aside>
+      </>
+    );
+  }
 
-        <div className="flex min-w-[1100px] flex-1 flex-col overflow-hidden p-1">
+  return (
+    <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
+      <div className="mx-auto flex h-full max-w-[1400px] gap-3 p-2 sm:p-4 xl:gap-4">
+        <aside className="hidden w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800 xl:flex">
+          {renderActivitiesPanel()}
+        </aside>
+
+        {activitiesDrawerOpen ? (
+          <div className="fixed inset-0 z-40 xl:hidden" aria-modal="true" role="dialog" aria-label="Activities drawer">
+            <button
+              type="button"
+              className="absolute inset-0 h-full w-full bg-black/70"
+              aria-label="Close activities drawer"
+              onClick={() => setActivitiesDrawerOpen(false)}
+            />
+            <div id="activities-drawer" className="absolute inset-y-0 left-0 flex w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden bg-zinc-900 p-2 shadow-2xl ring-1 ring-zinc-800">
+              <div className="mb-2 flex shrink-0 justify-end">
+                <button
+                  ref={activitiesDrawerCloseButtonRef}
+                  type="button"
+                  onClick={() => setActivitiesDrawerOpen(false)}
+                  className="flex items-center gap-2 rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800"
+                >
+                  <X className="h-4 w-4" />
+                  Close
+                </button>
+              </div>
+              {renderActivitiesPanel()}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden p-1">
           <div className="mb-3 flex shrink-0 flex-col items-center text-center">
             <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
             <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
@@ -1073,14 +1153,67 @@ export default function App() {
             </div>
           ) : null}
 
+          <div className="mb-3 flex shrink-0 flex-col gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800 xl:hidden">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                ref={activitiesDrawerOpenButtonRef}
+                type="button"
+                onClick={() => setActivitiesDrawerOpen(true)}
+                aria-expanded={activitiesDrawerOpen}
+                aria-controls="activities-drawer"
+                className="flex items-center gap-2 rounded-xl bg-zinc-100 px-3 py-2 text-zinc-950 ring-1 ring-zinc-200"
+              >
+                <Menu className="h-4 w-4" />
+                Activities
+              </button>
+              <div className="min-w-0 text-right text-xs text-zinc-300">
+                <div className="truncate">{selectedActivity ? selectedActivity.name : "No activity selected"}</div>
+                <div className="text-zinc-500">{activePlan.tool === "paint" ? "Paint" : "Erase"}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => updateActivePlan({ tool: "paint" })}
+                className={`rounded-xl px-3 py-2 ring-1 ${activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800"}`}
+              >
+                Paint
+              </button>
+              <button
+                onClick={() => updateActivePlan({ tool: "erase" })}
+                className={`rounded-xl px-3 py-2 ring-1 ${activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800"}`}
+              >
+                Erase
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setNarrowDayWindowStart((start) => moveNarrowDayWindow(start, -1))}
+                disabled={narrowDayWindowStart === 0}
+                className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
+              >
+                Previous
+              </button>
+              <div className="font-medium" aria-live="polite">{visibleDayRangeLabel}</div>
+              <button
+                type="button"
+                onClick={() => setNarrowDayWindowStart((start) => moveNarrowDayWindow(start, 1))}
+                disabled={narrowDayWindowStart === 4}
+                className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
-            <div className="mb-3 ml-1 mr-1 mt-1 flex items-center justify-between rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
-              <div className="flex items-center gap-2">
+            <div className="mb-3 ml-1 mr-1 mt-1 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-zinc-300">Plan</span>
                 <select
                   value={activePlan.id}
                   onChange={(e) => setActivePlanId(e.target.value)}
-                  className="h-8 rounded-xl bg-zinc-950 px-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
+                  className="h-8 min-w-0 rounded-xl bg-zinc-950 px-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
                 >
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -1131,7 +1264,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="hidden items-center gap-2 xl:flex">
                 <button
                   onClick={() => updateActivePlan({ tool: "paint" })}
                   className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
@@ -1179,10 +1312,10 @@ export default function App() {
             </div>
             <div className="mb-1 ml-1 mr-1 min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
               <div className="h-full overflow-auto">
-                <div className="sticky top-0 z-10 grid grid-cols-[84px_repeat(7,1fr)] overflow-hidden rounded-t-2xl bg-zinc-950/95 backdrop-blur">
+                <div className="sticky top-0 z-10 grid grid-cols-[64px_repeat(3,minmax(0,1fr))] xl:grid-cols-[84px_repeat(7,minmax(0,1fr))] overflow-hidden rounded-t-2xl bg-zinc-950/95 backdrop-blur">
                   <div className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
-                  {DAYS.map((d) => (
-                    <div key={d} className="border-b border-l border-zinc-800 px-3 py-2">
+                  {DAYS.map((d, dayIndex) => (
+                    <div key={d} className={`border-b border-l border-zinc-800 px-2 py-2 xl:px-3 ${visibleNarrowDaySet.has(dayIndex) ? "" : "hidden xl:block"}`}>
                       <div className="text-sm font-medium">{d}</div>
                     </div>
                   ))}
@@ -1196,7 +1329,7 @@ export default function App() {
                   const rowHeight = viewStep === 1 ? 16 : viewStep === 3 ? 18 : 32;
 
                   return (
-                    <div key={visIndex} className="grid grid-cols-[84px_repeat(7,1fr)]">
+                    <div key={visIndex} className="grid grid-cols-[64px_repeat(3,minmax(0,1fr))] xl:grid-cols-[84px_repeat(7,minmax(0,1fr))]">
                       <div
                         className={`flex items-center border-b border-zinc-900 px-3 text-[11px] ${
                           showLabel ? "text-zinc-300" : "text-zinc-600"
@@ -1218,9 +1351,12 @@ export default function App() {
                             <div
                               key={dayIndex}
                               onContextMenu={(e) => e.preventDefault()}
-                              onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
-                              onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
-                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 px-1 ${
+                              onPointerDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
+                              onPointerEnter={(e) => onCellPointerEnter(e, dayIndex, startRow)}
+                              onPointerMove={onCellPointerMove}
+                              onPointerUp={onCellPointerUp}
+                              onPointerCancel={onCellPointerCancel}
+                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 px-1 touch-pan-y ${visibleNarrowDaySet.has(dayIndex) ? "" : "hidden xl:block"} ${
                                 isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                               }`}
                               style={{
@@ -1243,9 +1379,12 @@ export default function App() {
                             <div
                               key={dayIndex}
                               onContextMenu={(e) => e.preventDefault()}
-                              onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
-                              onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
-                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 ${
+                              onPointerDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
+                              onPointerEnter={(e) => onCellPointerEnter(e, dayIndex, startRow)}
+                              onPointerMove={onCellPointerMove}
+                              onPointerUp={onCellPointerUp}
+                              onPointerCancel={onCellPointerCancel}
+                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 touch-pan-y ${visibleNarrowDaySet.has(dayIndex) ? "" : "hidden xl:block"} ${
                                 isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                               }`}
                               style={{ height: rowHeight, backgroundImage: cellInfo.gradient }}
@@ -1258,9 +1397,12 @@ export default function App() {
                           <div
                             key={dayIndex}
                             onContextMenu={(e) => e.preventDefault()}
-                            onMouseDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
-                            onMouseEnter={() => onCellPointerEnter(dayIndex, startRow)}
-                            className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 ${
+                            onPointerDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
+                            onPointerEnter={(e) => onCellPointerEnter(e, dayIndex, startRow)}
+                            onPointerMove={onCellPointerMove}
+                            onPointerUp={onCellPointerUp}
+                            onPointerCancel={onCellPointerCancel}
+                            className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 touch-pan-y ${visibleNarrowDaySet.has(dayIndex) ? "" : "hidden xl:block"} ${
                               isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                             }`}
                             style={{ height: rowHeight, background: "transparent" }}

@@ -23,6 +23,24 @@ export const CELLS_PER_DAY = 288;
 export const MINUTES_PER_CELL = 5;
 export const WEEK_TOTAL_MINUTES = DAYS_PER_WEEK * CELLS_PER_DAY * MINUTES_PER_CELL;
 
+export const NARROW_DAY_WINDOW_SIZE = 3;
+export const MIN_NARROW_DAY_WINDOW_START = 0;
+export const MAX_NARROW_DAY_WINDOW_START = DAYS_PER_WEEK - NARROW_DAY_WINDOW_SIZE;
+
+export function clampNarrowDayWindowStart(startDayIndex: number) {
+  if (!Number.isFinite(startDayIndex)) return MIN_NARROW_DAY_WINDOW_START;
+  return Math.min(MAX_NARROW_DAY_WINDOW_START, Math.max(MIN_NARROW_DAY_WINDOW_START, Math.trunc(startDayIndex)));
+}
+
+export function moveNarrowDayWindow(startDayIndex: number, direction: -1 | 1) {
+  return clampNarrowDayWindowStart(startDayIndex + direction);
+}
+
+export function narrowDayWindowIndices(startDayIndex: number) {
+  const clampedStart = clampNarrowDayWindowStart(startDayIndex);
+  return Array.from({ length: NARROW_DAY_WINDOW_SIZE }, (_, offset) => clampedStart + offset);
+}
+
 export function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }

@@ -245,18 +245,17 @@ After tests protect behaviour, separate:
 
 Avoid a rewrite. Use incremental extraction.
 
-### 5. Design mobile and touch behaviour
+### 5. Refine mobile and touch behaviour
 
-Treat mobile usability as a product-design task, not only a responsive CSS task.
+The first narrow-screen slice is implemented. Continue treating mobile usability as a product-design task, not only a responsive CSS task.
 
-Decisions are needed for:
+Further evidence is needed for:
 
-- navigating days on a small screen
-- zooming or changing time resolution
-- painting and erasing by touch
+- real-device comfort across supported narrow sizes
+- touch target size and density
+- activity drawer focus behaviour
+- touch activity reordering
 - undo and recovery
-- activity selection
-- grid scrolling
 - tablet layouts
 - keyboard and accessibility support
 
@@ -280,9 +279,9 @@ The application is difficult to change safely because persistence, interactions 
 
 ### Medium priority
 
-#### Mobile interaction is not designed
+#### Mobile interaction needs real-device verification
 
-The fixed-width layout, mouse painting and right-click erase behaviour are desktop-oriented.
+The first narrow-screen three-day grid, activities drawer and tap editing slice is implemented, but real-device and browser verification is still needed before mobile usability can be considered mature.
 
 #### Accessibility is incomplete
 
@@ -309,14 +308,6 @@ More descriptive commit messages will make future changes easier to understand a
 #### No licence is declared
 
 The repository does not currently state reuse or redistribution terms.
-
-## Recommended next Codex task
-
-The next implementation task should be:
-
-> Discuss and agree the first mobile usability slice, including day navigation and touch editing, before implementation.
-
-The pure-logic extraction sequence is complete. The next work should not make material mobile product decisions inside an implementation task. The project owner should first agree the intended small-screen navigation and touch editing behaviour, then Codex can implement a focused slice without changing storage keys or the persisted schema.
 
 ## Roadmap
 
@@ -443,3 +434,32 @@ Product details belong in `PRODUCT.md`.
 Architecture and data details belong in `TECHNICAL.md`.
 
 This file should remain focused on the current state and direction.
+
+## Completed responsive three-day planner slice
+
+The first responsive mobile and narrow-screen planner slice was completed on 17 July 2026.
+
+The change included:
+
+- adding a documented Tailwind `xl`, 1280 CSS pixel, breakpoint for the first narrow layout
+- showing exactly three overlapping consecutive days below that breakpoint, with Monday to Wednesday as the initial window and Friday to Sunday as the final window
+- keeping the desktop layout on seven days with the established permanent activities sidebar
+- moving the activities interface into an overlay drawer on narrow screens while reusing the same activities panel implementation
+- keeping the selected activity and Paint or Erase tool visible in a compact narrow toolbar while the drawer is closed
+- adding pointer-event planner-cell handling so touch-style taps paint or erase once, while vertical movement cancels the pending edit for normal scrolling
+- preserving the existing storage keys, version 3 persisted payload schema, five-minute storage grid and grouped-block painting behaviour
+- adding focused Vitest coverage for the five valid day windows, previous and next movement, clamping and underlying day indices
+
+Verified results after the change:
+
+- `npm run lint` passes
+- `npm run test` passes with 74 tests
+- `npm run build` passes
+
+Manual browser checks are still recommended at 375, 390, 430, 768 and 1440 CSS pixels before treating the mobile experience as complete. Remaining mobile risks include real-device touch feel, focus trapping inside the drawer, small-screen density, discoverability of vertical scrolling and activity reordering ergonomics inside the drawer.
+
+## Recommended next Codex task
+
+The next small implementation task should be:
+
+> Manually verify and refine the responsive planner slice on real or emulated narrow viewports, with emphasis on drawer focus behaviour, scrolling comfort, touch target sizes and activity reordering on touch devices.

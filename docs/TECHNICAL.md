@@ -492,3 +492,15 @@ The following items remain to be confirmed:
 - exact touch and keyboard interaction models
 - the appropriate long-term local Node.js version
 - whether any real pre-repository storage format exists outside repository history
+
+## Responsive narrow-screen implementation
+
+The first responsive planner slice was implemented on 17 July 2026.
+
+The narrow-layout breakpoint is the Tailwind `xl` breakpoint, 1280 CSS pixels. Below that breakpoint, `src/App.tsx` renders a three-day grid window and hides days outside the current window with responsive classes. At and above `xl`, the same weekly grid renders all seven logical days and the established permanently visible activities sidebar.
+
+The three-day day-window start is React interface state only. It is not part of `Plan`, the version 3 persisted payload, import or export. The helper functions `clampNarrowDayWindowStart`, `moveNarrowDayWindow` and `narrowDayWindowIndices` live in `src/domain/planner.ts` so the valid overlapping windows and underlying day indices are testable without coupling to React.
+
+The narrow activities interface reuses the existing activities panel through a single render helper. Desktop places it in the permanent sidebar, while narrow layouts place the same panel inside an overlay drawer. The drawer closes through its Close control, Escape and backdrop selection.
+
+Grid input handling now uses pointer events for planner cells. Mouse input preserves the established behaviour: mouse-down paints or erases immediately, mouse drag continues across cells and right-click erases. Touch and pen input create a pending single edit on pointer down, apply it on pointer up only when movement stays within a small tap threshold, and cancel it on scrolling movement or pointer cancellation. The touch path does not call `preventDefault`, so vertical scrolling remains a browser interaction rather than a planner painting gesture.

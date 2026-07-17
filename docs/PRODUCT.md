@@ -209,3 +209,15 @@ Useful indicators include:
 - the interface is dependable and reversible
 - the product remains distinct from calendars and task managers
 - the codebase can evolve without repeatedly breaking established behaviour
+
+## Approved narrow-screen planner model
+
+On 17 July 2026 the first responsive mobile and narrow-screen planner slice was approved and implemented.
+
+Below the Tailwind `xl` breakpoint, 1280 CSS pixels, the planner shows a three-day window rather than compressing all seven days or switching to a single-day view. The windows overlap by one day at a time: Monday to Wednesday, Tuesday to Thursday, Wednesday to Friday, Thursday to Saturday and Friday to Sunday. Previous and Next controls move between these windows and are disabled at the ends.
+
+The narrow grid keeps the time column visible beside the three day columns and is intended to support viewports down to 375 CSS pixels without horizontal page scrolling. At and above 1280 CSS pixels, the established seven-day desktop grid remains visible.
+
+On narrow screens the activities sidebar becomes an overlay drawer opened from an Activities button. The drawer overlays the planner so the grid width is not reduced. While the drawer is closed, the selected activity and Paint or Erase tool remain visible in a compact toolbar.
+
+Touch editing is deliberately tap-based for this slice. A deliberate tap on a displayed block paints or erases that whole displayed block, including the existing grouped 15-minute and 1-hour behaviour. Vertical swiping is reserved for normal grid scrolling and must not paint cells. Touch-drag painting is not part of this slice.
