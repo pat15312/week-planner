@@ -259,11 +259,9 @@ Further extraction should be incremental. `App.tsx` still owns interaction state
 
 ### Grid editing
 
-Grid painting currently uses mouse-oriented handlers and global mouse-up listeners.
+Grid painting uses pointer events per interaction. Primary mouse-button drag applies the active Paint or Erase tool only while the primary button remains held. Secondary mouse-button drag erases only while the secondary button remains held. Global pointer-up, pointer-cancel and window-blur cleanup end an active mouse drag even when release happens outside the grid. Touch and pen interactions remain tap-based, and movement beyond the tap threshold cancels the pending edit so vertical scrolling is preserved.
 
 Right-click always erases.
-
-This is effective on desktop but does not define a complete touch or keyboard interaction model.
 
 ### Activity ordering
 
@@ -497,10 +495,10 @@ The following items remain to be confirmed:
 
 The first responsive planner slice was implemented on 17 July 2026.
 
-The narrow-layout breakpoint is the Tailwind `xl` breakpoint, 1280 CSS pixels. Below that breakpoint, `src/App.tsx` renders a three-day grid window and hides days outside the current window with responsive classes. At and above `xl`, the same weekly grid renders all seven logical days and the established permanently visible activities sidebar.
+The activities-layout breakpoint is the Tailwind `xl` breakpoint, 1280 CSS pixels. Below that breakpoint, the activities panel is available through the overlay drawer. At and above `xl`, the established permanently visible activities sidebar remains in use.
 
-The three-day day-window start is React interface state only. It is not part of `Plan`, the version 3 persisted payload, import or export. The helper functions `clampNarrowDayWindowStart`, `moveNarrowDayWindow` and `narrowDayWindowIndices` live in `src/domain/planner.ts` so the valid overlapping windows and underlying day indices are testable without coupling to React.
+The planner grid measures its own available width with `ResizeObserver`, subtracts the rendered time-column width, and calculates a visible day count from the target usable day-column width of 120 CSS pixels. The result is clamped from three to seven days. `App.tsx` renders only the calculated consecutive day window and generates the grid column template from that count. The day-window start and visible count are React interface state only. They are not part of `Plan`, the version 3 persisted payload, import or export. The helper functions `calculateVisibleDayCount`, `clampDayWindowStart`, `moveDayWindow` and `dayWindowIndices` live in `src/domain/planner.ts` so the responsive windows and underlying day indices are testable without coupling to React.
 
 The narrow activities interface reuses the existing activities panel through a single render helper. Desktop places it in the permanent sidebar, while narrow layouts place the same panel inside an overlay drawer. The drawer closes through its Close control, Escape and backdrop selection. While open, it applies `inert` to the background planner, moves focus to the drawer Close button, traps Tab and Shift+Tab within drawer controls, and restores focus to the opener when it closes within the narrow layout. If the viewport enters the desktop `xl` breakpoint while the drawer is open, the drawer closes without trying to restore focus to the now-hidden narrow Activities button.
 
-Grid input handling now uses pointer events for planner cells. Mouse input preserves the established behaviour: mouse-down paints or erases immediately, mouse drag continues across cells and right-click erases. Touch and pen input create a pending single edit on pointer down, apply it on pointer up only when movement stays within a small tap threshold, and cancel it on scrolling movement or pointer cancellation. The touch path does not call `preventDefault`, so vertical scrolling remains a browser interaction rather than a planner painting gesture.
+Grid input handling uses pointer events for planner cells. Mouse input preserves the established editing model while adding button-state safeguards: primary mouse-down paints or erases with the active tool, secondary mouse-down erases, drag editing continues only while the required button bit remains present on `PointerEvent.buttons`, and pointer release, cancellation or window blur clears the drag state. Touch and pen input create a pending single edit on pointer down, apply it on pointer up only when movement stays within a small tap threshold, and cancel it on scrolling movement or pointer cancellation. The touch path does not call `preventDefault`, so vertical scrolling remains a browser interaction rather than a planner painting gesture.

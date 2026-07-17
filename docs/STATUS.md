@@ -281,7 +281,7 @@ The application is difficult to change safely because persistence, interactions 
 
 #### Mobile interaction needs real-device verification
 
-The first narrow-screen three-day grid, activities drawer and tap editing slice is implemented, but real-device and browser verification is still needed before mobile usability can be considered mature.
+The first responsive 3-to-7-day grid, activities drawer and tap editing slice is implemented, but real-device and browser verification is still needed before mobile usability can be considered mature.
 
 #### Accessibility is incomplete
 
@@ -435,28 +435,28 @@ Architecture and data details belong in `TECHNICAL.md`.
 
 This file should remain focused on the current state and direction.
 
-## Completed responsive three-day planner slice
+## Completed responsive variable-day planner slice
 
-The first responsive mobile and narrow-screen planner slice was completed on 17 July 2026.
+The first responsive mobile and narrow-screen planner slice was completed on 17 July 2026 and corrected to use a measured 3-to-7-day window.
 
 The change included:
 
-- adding a documented Tailwind `xl`, 1280 CSS pixel, breakpoint for the first narrow layout
-- showing exactly three overlapping consecutive days below that breakpoint, with Monday to Wednesday as the initial window and Friday to Sunday as the final window
+- keeping the Tailwind `xl`, 1280 CSS pixel, breakpoint for switching between the overlay activities drawer and desktop sidebar
+- measuring the planner grid width and showing a consecutive 3-to-7-day window based on the space available for day columns
 - keeping the desktop layout on seven days with the established permanent activities sidebar
 - moving the activities interface into an overlay drawer on narrow screens while reusing the same activities panel implementation
 - keeping the selected activity and Paint or Erase tool visible in a compact narrow toolbar while the drawer is closed
-- adding pointer-event planner-cell handling so touch-style taps paint or erase once, while vertical movement cancels the pending edit for normal scrolling
+- adding pointer-event planner-cell handling so mouse drags edit only while the required button remains held, right-button drags erase, touch-style taps paint or erase once, and vertical movement cancels the pending edit for normal scrolling
 - preserving the existing storage keys, version 3 persisted payload schema, five-minute storage grid and grouped-block painting behaviour
-- adding focused Vitest coverage for the five valid day windows, previous and next movement, clamping and underlying day indices
+- adding focused Vitest coverage for visible day-count calculation, 3-to-7-day windows, previous and next movement, clamping, underlying day indices and mouse button-state predicates
 
 Verified results after the change:
 
 - `npm run lint` passes
-- `npm run test` passes with 74 tests
+- `npm run test` passes with 82 tests
 - `npm run build` passes
 
-Manual browser checks are still recommended at 375, 390, 430, 768 and 1440 CSS pixels before treating the mobile experience as complete. Remaining mobile risks include real-device touch feel, small-screen density, discoverability of vertical scrolling and activity reordering ergonomics inside the drawer.
+Manual browser checks are still recommended at 375, 768, 1024 and 1440 CSS pixels before treating the responsive experience as complete. Remaining mobile risks include real-device touch feel, small-screen density, discoverability of vertical scrolling, pointer behaviour on hybrid devices and activity reordering ergonomics inside the drawer.
 
 ## Recommended next Codex task
 

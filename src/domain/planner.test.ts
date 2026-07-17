@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   addPlanAndSelect,
   buildEmptyWeek,
-  clampNarrowDayWindowStart,
-  MAX_NARROW_DAY_WINDOW_START,
-  moveNarrowDayWindow,
-  narrowDayWindowIndices,
+  calculateVisibleDayCount,
+  clearEndedMouseDragInteraction,
+  clampDayWindowStart,
+  dayWindowIndices,
+  isMouseDragButtonHeld,
+  moveDayWindow,
   calculateAllocationSummary,
   CELLS_PER_DAY,
   clearGridForActivity,
@@ -365,33 +367,108 @@ describe("plan operations", () => {
   });
 });
 
-describe("narrow day windows", () => {
-  it("returns the five valid overlapping three-day windows", () => {
-    expect(Array.from({ length: MAX_NARROW_DAY_WINDOW_START + 1 }, (_, start) => narrowDayWindowIndices(start))).toEqual([
+describe("day windows", () => {
+  it("calculates visible day count with a minimum of three and maximum of seven", () => {
+    expect(calculateVisibleDayCount(-1)).toBe(3);
+    expect(calculateVisibleDayCount(0)).toBe(3);
+    expect(calculateVisibleDayCount(119)).toBe(3);
+    expect(calculateVisibleDayCount(360)).toBe(3);
+    expect(calculateVisibleDayCount(480)).toBe(4);
+    expect(calculateVisibleDayCount(600)).toBe(5);
+    expect(calculateVisibleDayCount(720)).toBe(6);
+    expect(calculateVisibleDayCount(840)).toBe(7);
+    expect(calculateVisibleDayCount(1200)).toBe(7);
+  });
+
+  it("falls back safely for invalid width inputs", () => {
+    expect(calculateVisibleDayCount(Number.NaN)).toBe(3);
+    expect(calculateVisibleDayCount(Number.POSITIVE_INFINITY)).toBe(3);
+    expect(calculateVisibleDayCount(480, 0)).toBe(3);
+    expect(calculateVisibleDayCount(480, Number.NaN)).toBe(3);
+  });
+
+  it("returns all valid consecutive windows for differing visible counts", () => {
+    expect(Array.from({ length: 5 }, (_, start) => dayWindowIndices(start, 3))).toEqual([
       [0, 1, 2],
       [1, 2, 3],
       [2, 3, 4],
       [3, 4, 5],
       [4, 5, 6],
     ]);
+    expect(Array.from({ length: 4 }, (_, start) => dayWindowIndices(start, 4))).toEqual([
+      [0, 1, 2, 3],
+      [1, 2, 3, 4],
+      [2, 3, 4, 5],
+      [3, 4, 5, 6],
+    ]);
+    expect(Array.from({ length: 3 }, (_, start) => dayWindowIndices(start, 5))).toEqual([
+      [0, 1, 2, 3, 4],
+      [1, 2, 3, 4, 5],
+      [2, 3, 4, 5, 6],
+    ]);
+    expect(Array.from({ length: 2 }, (_, start) => dayWindowIndices(start, 6))).toEqual([
+      [0, 1, 2, 3, 4, 5],
+      [1, 2, 3, 4, 5, 6],
+    ]);
+    expect(dayWindowIndices(0, 7)).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
-  it("moves previous and next by one day", () => {
-    expect(moveNarrowDayWindow(2, -1)).toBe(1);
-    expect(moveNarrowDayWindow(2, 1)).toBe(3);
+  it("moves previous and next by one day and clamps at Monday and Sunday", () => {
+    expect(moveDayWindow(2, 4, -1)).toBe(1);
+    expect(moveDayWindow(2, 4, 1)).toBe(3);
+    expect(moveDayWindow(0, 4, -1)).toBe(0);
+    expect(moveDayWindow(3, 4, 1)).toBe(3);
   });
 
-  it("clamps movement at both ends", () => {
-    expect(moveNarrowDayWindow(0, -1)).toBe(0);
-    expect(moveNarrowDayWindow(MAX_NARROW_DAY_WINDOW_START, 1)).toBe(MAX_NARROW_DAY_WINDOW_START);
+  it("clamps current starts when resizing changes the visible count", () => {
+    expect(clampDayWindowStart(4, 3)).toBe(4);
+    expect(clampDayWindowStart(4, 4)).toBe(3);
+    expect(clampDayWindowStart(4, 5)).toBe(2);
+    expect(clampDayWindowStart(4, 6)).toBe(1);
+    expect(clampDayWindowStart(4, 7)).toBe(0);
+    expect(clampDayWindowStart(-10, 5)).toBe(0);
+    expect(clampDayWindowStart(Number.NaN, 5)).toBe(0);
   });
 
-  it("clamps invalid requested starts before deriving underlying day indices", () => {
-    expect(clampNarrowDayWindowStart(-10)).toBe(0);
-    expect(clampNarrowDayWindowStart(99)).toBe(4);
-    expect(clampNarrowDayWindowStart(2.8)).toBe(2);
-    expect(clampNarrowDayWindowStart(Number.NaN)).toBe(0);
-    expect(narrowDayWindowIndices(99)).toEqual([4, 5, 6]);
+  it("does not produce invalid day indices for unexpected inputs", () => {
+    expect(dayWindowIndices(99, 99)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(dayWindowIndices(99, Number.NaN)).toEqual([4, 5, 6]);
+    expect(dayWindowIndices(Number.NaN, 4)).toEqual([0, 1, 2, 3]);
+  });
+});
+
+describe("mouse drag button checks", () => {
+  it("detects the primary mouse button", () => {
+    expect(isMouseDragButtonHeld(1, "primary")).toBe(true);
+    expect(isMouseDragButtonHeld(3, "primary")).toBe(true);
+  });
+
+  it("detects the secondary mouse button", () => {
+    expect(isMouseDragButtonHeld(2, "secondary")).toBe(true);
+    expect(isMouseDragButtonHeld(3, "secondary")).toBe(true);
+  });
+
+  it("rejects no buttons and unrelated buttons", () => {
+    expect(isMouseDragButtonHeld(0, "primary")).toBe(false);
+    expect(isMouseDragButtonHeld(0, "secondary")).toBe(false);
+    expect(isMouseDragButtonHeld(4, "primary")).toBe(false);
+    expect(isMouseDragButtonHeld(4, "secondary")).toBe(false);
+  });
+
+  it("treats invalid button state as released", () => {
+    expect(isMouseDragButtonHeld(Number.NaN, "primary")).toBe(false);
+    expect(isMouseDragButtonHeld(Number.POSITIVE_INFINITY, "secondary")).toBe(false);
+  });
+
+  it("clears release and cancellation for the active pointer only", () => {
+    const state = { pointerId: 7 };
+    expect(clearEndedMouseDragInteraction(state, { kind: "pointerend", pointerId: 7 })).toBeNull();
+    expect(clearEndedMouseDragInteraction(state, { kind: "pointerend", pointerId: 8 })).toBe(state);
+  });
+
+  it("clears active mouse drags on loss of focus", () => {
+    expect(clearEndedMouseDragInteraction({ pointerId: 7 }, { kind: "blur" })).toBeNull();
+    expect(clearEndedMouseDragInteraction(null, { kind: "blur" })).toBeNull();
   });
 });
 

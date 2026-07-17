@@ -23,22 +23,58 @@ export const CELLS_PER_DAY = 288;
 export const MINUTES_PER_CELL = 5;
 export const WEEK_TOTAL_MINUTES = DAYS_PER_WEEK * CELLS_PER_DAY * MINUTES_PER_CELL;
 
-export const NARROW_DAY_WINDOW_SIZE = 3;
-export const MIN_NARROW_DAY_WINDOW_START = 0;
-export const MAX_NARROW_DAY_WINDOW_START = DAYS_PER_WEEK - NARROW_DAY_WINDOW_SIZE;
+export const MIN_VISIBLE_DAY_COUNT = 3;
+export const MAX_VISIBLE_DAY_COUNT = DAYS_PER_WEEK;
+export const TARGET_DAY_COLUMN_WIDTH_PX = 120;
+export const MIN_DAY_WINDOW_START = 0;
 
-export function clampNarrowDayWindowStart(startDayIndex: number) {
-  if (!Number.isFinite(startDayIndex)) return MIN_NARROW_DAY_WINDOW_START;
-  return Math.min(MAX_NARROW_DAY_WINDOW_START, Math.max(MIN_NARROW_DAY_WINDOW_START, Math.trunc(startDayIndex)));
+export function clampVisibleDayCount(visibleDayCount: number) {
+  if (!Number.isFinite(visibleDayCount)) return MIN_VISIBLE_DAY_COUNT;
+  return Math.min(MAX_VISIBLE_DAY_COUNT, Math.max(MIN_VISIBLE_DAY_COUNT, Math.trunc(visibleDayCount)));
 }
 
-export function moveNarrowDayWindow(startDayIndex: number, direction: -1 | 1) {
-  return clampNarrowDayWindowStart(startDayIndex + direction);
+export function calculateVisibleDayCount(availableDayColumnWidthPx: number, targetDayColumnWidthPx = TARGET_DAY_COLUMN_WIDTH_PX) {
+  if (!Number.isFinite(availableDayColumnWidthPx) || !Number.isFinite(targetDayColumnWidthPx) || targetDayColumnWidthPx <= 0) {
+    return MIN_VISIBLE_DAY_COUNT;
+  }
+  return clampVisibleDayCount(Math.floor(availableDayColumnWidthPx / targetDayColumnWidthPx));
 }
 
-export function narrowDayWindowIndices(startDayIndex: number) {
-  const clampedStart = clampNarrowDayWindowStart(startDayIndex);
-  return Array.from({ length: NARROW_DAY_WINDOW_SIZE }, (_, offset) => clampedStart + offset);
+export function maxDayWindowStart(visibleDayCount: number) {
+  return DAYS_PER_WEEK - clampVisibleDayCount(visibleDayCount);
+}
+
+export function clampDayWindowStart(startDayIndex: number, visibleDayCount: number) {
+  if (!Number.isFinite(startDayIndex)) return MIN_DAY_WINDOW_START;
+  return Math.min(maxDayWindowStart(visibleDayCount), Math.max(MIN_DAY_WINDOW_START, Math.trunc(startDayIndex)));
+}
+
+export function moveDayWindow(startDayIndex: number, visibleDayCount: number, direction: -1 | 1) {
+  return clampDayWindowStart(startDayIndex + direction, visibleDayCount);
+}
+
+export function dayWindowIndices(startDayIndex: number, visibleDayCount: number) {
+  const clampedVisibleDayCount = clampVisibleDayCount(visibleDayCount);
+  const clampedStart = clampDayWindowStart(startDayIndex, clampedVisibleDayCount);
+  return Array.from({ length: clampedVisibleDayCount }, (_, offset) => clampedStart + offset);
+}
+
+export type MouseDragButton = "primary" | "secondary";
+
+export function isMouseDragButtonHeld(buttons: number, dragButton: MouseDragButton) {
+  if (!Number.isFinite(buttons)) return false;
+  const requiredButtonBit = dragButton === "primary" ? 1 : 2;
+  return (Math.trunc(buttons) & requiredButtonBit) === requiredButtonBit;
+}
+
+export type MouseDragInteractionState = { pointerId: number } | null;
+
+export type MouseDragEndEvent = { kind: "pointerend"; pointerId: number } | { kind: "blur" };
+
+export function clearEndedMouseDragInteraction<T extends MouseDragInteractionState>(state: T, event: MouseDragEndEvent): T | null {
+  if (!state) return null;
+  if (event.kind === "blur") return null;
+  return state.pointerId === event.pointerId ? null : state;
 }
 
 export function uid() {

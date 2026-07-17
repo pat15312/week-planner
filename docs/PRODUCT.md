@@ -214,10 +214,10 @@ Useful indicators include:
 
 On 17 July 2026 the first responsive mobile and narrow-screen planner slice was approved and implemented.
 
-Below the Tailwind `xl` breakpoint, 1280 CSS pixels, the planner shows a three-day window rather than compressing all seven days or switching to a single-day view. The windows overlap by one day at a time: Monday to Wednesday, Tuesday to Thursday, Wednesday to Friday, Thursday to Saturday and Friday to Sunday. Previous and Next controls move between these windows and are disabled at the ends.
+The planner shows a consecutive day window based on the measured width available for day columns. It shows at least three days, expands through four, five and six days when space permits, and shows the complete seven-day week when all days fit. Previous and Next controls move partial-week windows by one day and are disabled at the Monday and Sunday boundaries.
 
-The narrow grid keeps the time column visible beside the three day columns and is intended to support viewports down to 375 CSS pixels without horizontal page scrolling. At and above 1280 CSS pixels, the established seven-day desktop grid remains visible.
+The grid keeps the time column visible beside the day columns and is intended to support viewports down to 375 CSS pixels without horizontal page scrolling. At and above 1280 CSS pixels, the established permanent activities sidebar remains visible.
 
 On narrow screens the activities sidebar becomes an overlay drawer opened from an Activities button. The drawer overlays the planner so the grid width is not reduced. While the drawer is closed, the selected activity and Paint or Erase tool remain visible in a compact toolbar.
 
-Touch editing is deliberately tap-based for this slice. A deliberate tap on a displayed block paints or erases that whole displayed block, including the existing grouped 15-minute and 1-hour behaviour. Vertical swiping is reserved for normal grid scrolling and must not paint cells. Touch-drag painting is not part of this slice.
+Touch editing is deliberately tap-based for this slice. A deliberate touch or pen tap on a displayed block paints or erases that whole displayed block, including the existing grouped 15-minute and 1-hour behaviour. Vertical swiping is reserved for normal grid scrolling and must not paint cells. Mouse dragging remains a per-interaction behaviour: editing continues only while the relevant mouse button is physically held, and right-button dragging erases.

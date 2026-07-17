@@ -41,8 +41,13 @@ import {
   deletePlanAndSelectFallback,
   duplicatePlanAndSelect,
   makeDefaultPlan,
-  moveNarrowDayWindow,
-  narrowDayWindowIndices,
+  calculateVisibleDayCount,
+  clampDayWindowStart,
+  dayWindowIndices,
+  clearEndedMouseDragInteraction,
+  isMouseDragButtonHeld,
+  moveDayWindow,
+  type MouseDragButton,
   renamePlan,
   reorderByIndex,
   summariseGroupedBlock,
@@ -78,11 +83,12 @@ import {
 // - Activity customisation (name, colour, icon)
 // - Pointer-based drag-to-reorder activities
 // - Right click ALWAYS erases
-// - Narrow screens below Tailwind xl (1280 CSS pixels) show a three-day window
+// - Planner grid shows a 3-to-7-day window based on measured available width
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TOUCH_TAP_MOVE_THRESHOLD_PX = 10;
 const TAILWIND_XL_MEDIA_QUERY = "(min-width: 1280px)";
+const TIME_COLUMN_WIDTH_PX = 64;
 
 const PRESET_COLOURS = [
   "#E11D48",
@@ -182,15 +188,17 @@ export default function App() {
   const activityDrawerPreviousFocusRef = useRef<HTMLElement | null>(null);
   const activityDrawerWasOpenRef = useRef(false);
   const activityDrawerShouldRestoreFocusRef = useRef(true);
-  const [narrowDayWindowStart, setNarrowDayWindowStart] = useState(0);
+  const [dayWindowStart, setDayWindowStart] = useState(0);
+  const [visibleDayCount, setVisibleDayCount] = useState(3);
+  const gridViewportRef = useRef<HTMLDivElement | null>(null);
+  const timeColumnHeaderRef = useRef<HTMLDivElement | null>(null);
 
   // Grid view scale
   const [timeScale, setTimeScale] = useState<"5" | "15" | "60">("5");
   const viewStep = timeScale === "5" ? 1 : timeScale === "15" ? 3 : 12;
 
   // Painting state
-  const isMouseDownRef = useRef(false);
-  const dragPaintModeRef = useRef<ToolMode>("paint");
+  const activeMouseDragRef = useRef<{ pointerId: number; button: MouseDragButton; mode: ToolMode } | null>(null);
   const lastPaintRef = useRef<{ day: number | null; row: number | null }>({ day: null, row: null });
   const pendingTouchEditRef = useRef<{ pointerId: number; dayIndex: number; startRow: number; startX: number; startY: number; cancelled: boolean } | null>(null);
 
@@ -311,18 +319,29 @@ export default function App() {
     if (!activePlanId || !plans.some((p) => p.id === activePlanId)) setActivePlanId(plans[0].id);
   }, [plans, activePlanId]);
 
-  // Global mouse up ends painting drag
+  function clearMouseDrag() {
+    activeMouseDragRef.current = null;
+    lastPaintRef.current = { day: null, row: null };
+  }
+
+  // Global pointer cleanup ends mouse painting even when release happens outside the grid.
   useEffect(() => {
-    const onUp = () => {
-      isMouseDownRef.current = false;
-      dragPaintModeRef.current = "paint";
-      lastPaintRef.current = { day: null, row: null };
+    const onPointerEnd = (e: PointerEvent) => {
+      const nextDrag = clearEndedMouseDragInteraction(activeMouseDragRef.current, { kind: "pointerend", pointerId: e.pointerId });
+      if (nextDrag === activeMouseDragRef.current) return;
+      clearMouseDrag();
     };
-    window.addEventListener("mouseup", onUp);
-    window.addEventListener("mouseleave", onUp);
+    const onBlur = () => {
+      if (clearEndedMouseDragInteraction(activeMouseDragRef.current, { kind: "blur" }) === null) clearMouseDrag();
+    };
+
+    window.addEventListener("pointerup", onPointerEnd);
+    window.addEventListener("pointercancel", onPointerEnd);
+    window.addEventListener("blur", onBlur);
     return () => {
-      window.removeEventListener("mouseup", onUp);
-      window.removeEventListener("mouseleave", onUp);
+      window.removeEventListener("pointerup", onPointerEnd);
+      window.removeEventListener("pointercancel", onPointerEnd);
+      window.removeEventListener("blur", onBlur);
     };
   }, []);
 
@@ -419,10 +438,34 @@ export default function App() {
   }, [activePlan.activities]);
 
   const allocationSummary = useMemo(() => calculateAllocationSummary(activePlan), [activePlan]);
-  const visibleNarrowDayIndices = useMemo(() => narrowDayWindowIndices(narrowDayWindowStart), [narrowDayWindowStart]);
-  const visibleNarrowDaySet = useMemo(() => new Set(visibleNarrowDayIndices), [visibleNarrowDayIndices]);
-  const visibleDayRangeLabel = `${DAYS[visibleNarrowDayIndices[0]]}–${DAYS[visibleNarrowDayIndices[visibleNarrowDayIndices.length - 1]]}`;
+  const visibleDayIndices = useMemo(() => dayWindowIndices(dayWindowStart, visibleDayCount), [dayWindowStart, visibleDayCount]);
+  const visibleDayRangeLabel = `${DAYS[visibleDayIndices[0]]}–${DAYS[visibleDayIndices[visibleDayIndices.length - 1]]}`;
   const selectedActivity = activePlan.activities.find((activity) => activity.id === activePlan.selectedActivityId) ?? null;
+  const canNavigateDayWindow = visibleDayCount < DAYS.length;
+  const canNavigatePrevious = dayWindowStart > 0;
+  const canNavigateNext = dayWindowStart + visibleDayCount < DAYS.length;
+  const gridTemplateColumns = `${TIME_COLUMN_WIDTH_PX}px repeat(${visibleDayCount}, minmax(0, 1fr))`;
+
+  useEffect(() => {
+    const viewport = gridViewportRef.current;
+    if (!viewport) return;
+
+    const updateVisibleDayCount = () => {
+      const timeColumnWidth = timeColumnHeaderRef.current?.getBoundingClientRect().width ?? TIME_COLUMN_WIDTH_PX;
+      const availableDayColumnWidth = viewport.getBoundingClientRect().width - timeColumnWidth;
+      setVisibleDayCount(calculateVisibleDayCount(availableDayColumnWidth));
+    };
+
+    updateVisibleDayCount();
+    const resizeObserver = new ResizeObserver(updateVisibleDayCount);
+    resizeObserver.observe(viewport);
+    if (timeColumnHeaderRef.current) resizeObserver.observe(timeColumnHeaderRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setDayWindowStart((start) => clampDayWindowStart(start, visibleDayCount));
+  }, [visibleDayCount]);
 
   function applyRange(dayIndex: number, startRow: number, len: number, activityIdOrNull: string | null) {
     updateActivePlan((p) => ({ grid: updateGridRange(p.grid, dayIndex, startRow, len, activityIdOrNull) }));
@@ -435,11 +478,18 @@ export default function App() {
   }
 
   function onCellPointerEnter(e: React.PointerEvent, dayIndex: number, startRow: number) {
-    if (e.pointerType !== "mouse" || !isMouseDownRef.current) return;
+    if (e.pointerType !== "mouse") return;
+    const activeDrag = activeMouseDragRef.current;
+    if (!activeDrag || activeDrag.pointerId !== e.pointerId) return;
+    if (!isMouseDragButtonHeld(e.buttons, activeDrag.button)) {
+      clearMouseDrag();
+      return;
+    }
+
     const last = lastPaintRef.current;
     if (last.day === dayIndex && last.row === startRow) return;
     lastPaintRef.current = { day: dayIndex, row: startRow };
-    applyActiveToolOnce(dayIndex, startRow, dragPaintModeRef.current || "paint");
+    applyActiveToolOnce(dayIndex, startRow, activeDrag.mode);
   }
 
   function onCellPointerDown(e: React.PointerEvent, dayIndex: number, startRow: number) {
@@ -449,14 +499,18 @@ export default function App() {
       return;
     }
 
-    e.preventDefault();
-    const buttons = e.buttons;
-    const isRightClick = e.button === 2 || (buttons & 2) === 2;
+    if (e.pointerType !== "mouse") return;
 
-    isMouseDownRef.current = true;
+    const isPrimary = e.button === 0 && isMouseDragButtonHeld(e.buttons, "primary");
+    const isSecondary = (e.button === 2 || (e.buttons & 2) === 2) && isMouseDragButtonHeld(e.buttons, "secondary");
+    if (!isPrimary && !isSecondary) return;
+
+    e.preventDefault();
+    const button: MouseDragButton = isSecondary ? "secondary" : "primary";
+    const mode: ToolMode = isSecondary ? "erase" : activePlan.tool;
+    activeMouseDragRef.current = { pointerId: e.pointerId, button, mode };
     lastPaintRef.current = { day: dayIndex, row: startRow };
-    dragPaintModeRef.current = isRightClick ? "erase" : activePlan.tool;
-    applyActiveToolOnce(dayIndex, startRow, dragPaintModeRef.current);
+    applyActiveToolOnce(dayIndex, startRow, mode);
   }
 
   function onCellPointerMove(e: React.PointerEvent) {
@@ -466,6 +520,9 @@ export default function App() {
   }
 
   function onCellPointerUp(e: React.PointerEvent) {
+    const activeDrag = activeMouseDragRef.current;
+    if (activeDrag?.pointerId === e.pointerId) clearMouseDrag();
+
     const pending = pendingTouchEditRef.current;
     if (!pending || pending.pointerId !== e.pointerId) return;
     pendingTouchEditRef.current = null;
@@ -473,6 +530,9 @@ export default function App() {
   }
 
   function onCellPointerCancel(e: React.PointerEvent) {
+    const activeDrag = activeMouseDragRef.current;
+    if (activeDrag?.pointerId === e.pointerId) clearMouseDrag();
+
     const pending = pendingTouchEditRef.current;
     if (pending?.pointerId === e.pointerId) pendingTouchEditRef.current = null;
   }
@@ -1307,23 +1367,27 @@ export default function App() {
               </button>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => setNarrowDayWindowStart((start) => moveNarrowDayWindow(start, -1))}
-                disabled={narrowDayWindowStart === 0}
-                className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
-              >
-                Previous
-              </button>
+              {canNavigateDayWindow ? (
+                <button
+                  type="button"
+                  onClick={() => setDayWindowStart((start) => moveDayWindow(start, visibleDayCount, -1))}
+                  disabled={!canNavigatePrevious}
+                  className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
+                >
+                  Previous
+                </button>
+              ) : null}
               <div className="font-medium" aria-live="polite">{visibleDayRangeLabel}</div>
-              <button
-                type="button"
-                onClick={() => setNarrowDayWindowStart((start) => moveNarrowDayWindow(start, 1))}
-                disabled={narrowDayWindowStart === 4}
-                className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
-              >
-                Next
-              </button>
+              {canNavigateDayWindow ? (
+                <button
+                  type="button"
+                  onClick={() => setDayWindowStart((start) => moveDayWindow(start, visibleDayCount, 1))}
+                  disabled={!canNavigateNext}
+                  className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
+                >
+                  Next
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -1432,12 +1496,12 @@ export default function App() {
               </div>
             </div>
             <div className="mb-1 ml-1 mr-1 min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
-              <div className="h-full overflow-auto">
-                <div className="sticky top-0 z-10 grid grid-cols-[64px_repeat(3,minmax(0,1fr))] xl:grid-cols-[84px_repeat(7,minmax(0,1fr))] overflow-hidden rounded-t-2xl bg-zinc-950/95 backdrop-blur">
-                  <div className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
-                  {DAYS.map((d, dayIndex) => (
-                    <div key={d} className={`border-b border-l border-zinc-800 px-2 py-2 xl:px-3 ${visibleNarrowDaySet.has(dayIndex) ? "" : "hidden xl:block"}`}>
-                      <div className="text-sm font-medium">{d}</div>
+              <div ref={gridViewportRef} className="h-full overflow-auto">
+                <div className="sticky top-0 z-10 grid overflow-hidden rounded-t-2xl bg-zinc-950/95 backdrop-blur" style={{ gridTemplateColumns }}>
+                  <div ref={timeColumnHeaderRef} className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
+                  {visibleDayIndices.map((dayIndex) => (
+                    <div key={DAYS[dayIndex]} className="border-b border-l border-zinc-800 px-2 py-2 xl:px-3">
+                      <div className="text-sm font-medium">{DAYS[dayIndex]}</div>
                     </div>
                   ))}
                 </div>
@@ -1450,7 +1514,7 @@ export default function App() {
                   const rowHeight = viewStep === 1 ? 16 : viewStep === 3 ? 18 : 32;
 
                   return (
-                    <div key={visIndex} className="grid grid-cols-[64px_repeat(3,minmax(0,1fr))] xl:grid-cols-[84px_repeat(7,minmax(0,1fr))]">
+                    <div key={visIndex} className="grid" style={{ gridTemplateColumns }}>
                       <div
                         className={`flex items-center border-b border-zinc-900 px-3 text-[11px] ${
                           showLabel ? "text-zinc-300" : "text-zinc-600"
@@ -1460,7 +1524,7 @@ export default function App() {
                         {showLabel ? time : ""}
                       </div>
 
-                      {Array.from({ length: DAYS.length }, (_, dayIndex) => {
+                      {visibleDayIndices.map((dayIndex) => {
                         const cellInfo = getStripeBackground(dayIndex, startRow);
                         const isQuarterHour = startRow % 3 === 0;
                         const isHour = startRow % 12 === 0;
@@ -1477,7 +1541,7 @@ export default function App() {
                               onPointerMove={onCellPointerMove}
                               onPointerUp={onCellPointerUp}
                               onPointerCancel={onCellPointerCancel}
-                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 px-1 touch-pan-y ${visibleNarrowDaySet.has(dayIndex) ? "" : "hidden xl:block"} ${
+                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 px-1 touch-pan-y ${
                                 isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                               }`}
                               style={{
@@ -1505,7 +1569,7 @@ export default function App() {
                               onPointerMove={onCellPointerMove}
                               onPointerUp={onCellPointerUp}
                               onPointerCancel={onCellPointerCancel}
-                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 touch-pan-y ${visibleNarrowDaySet.has(dayIndex) ? "" : "hidden xl:block"} ${
+                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 touch-pan-y ${
                                 isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                               }`}
                               style={{ height: rowHeight, backgroundImage: cellInfo.gradient }}
@@ -1523,7 +1587,7 @@ export default function App() {
                             onPointerMove={onCellPointerMove}
                             onPointerUp={onCellPointerUp}
                             onPointerCancel={onCellPointerCancel}
-                            className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 touch-pan-y ${visibleNarrowDaySet.has(dayIndex) ? "" : "hidden xl:block"} ${
+                            className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 touch-pan-y ${
                               isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
                             }`}
                             style={{ height: rowHeight, background: "transparent" }}
