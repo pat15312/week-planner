@@ -88,7 +88,7 @@ import {
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TOUCH_TAP_MOVE_THRESHOLD_PX = 10;
 const TAILWIND_XL_MEDIA_QUERY = "(min-width: 1280px)";
-const TIME_COLUMN_WIDTH_PX = 64;
+const FALLBACK_TIME_COLUMN_WIDTH_PX = 64;
 
 const PRESET_COLOURS = [
   "#E11D48",
@@ -444,14 +444,14 @@ export default function App() {
   const canNavigateDayWindow = visibleDayCount < DAYS.length;
   const canNavigatePrevious = dayWindowStart > 0;
   const canNavigateNext = dayWindowStart + visibleDayCount < DAYS.length;
-  const gridTemplateColumns = `${TIME_COLUMN_WIDTH_PX}px repeat(${visibleDayCount}, minmax(0, 1fr))`;
+  const gridTemplateColumns = `var(--time-column-width) repeat(${visibleDayCount}, minmax(0, 1fr))`;
 
   useEffect(() => {
     const viewport = gridViewportRef.current;
     if (!viewport) return;
 
     const updateVisibleDayCount = () => {
-      const timeColumnWidth = timeColumnHeaderRef.current?.getBoundingClientRect().width ?? TIME_COLUMN_WIDTH_PX;
+      const timeColumnWidth = timeColumnHeaderRef.current?.getBoundingClientRect().width ?? FALLBACK_TIME_COLUMN_WIDTH_PX;
       const availableDayColumnWidth = viewport.getBoundingClientRect().width - timeColumnWidth;
       setVisibleDayCount(calculateVisibleDayCount(availableDayColumnWidth));
     };
@@ -1280,6 +1280,32 @@ export default function App() {
     );
   }
 
+  function renderDayNavigation() {
+    if (!canNavigateDayWindow) return null;
+
+    return (
+      <div className="mb-2 ml-1 mr-1 flex items-center justify-between gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
+        <button
+          type="button"
+          onClick={() => setDayWindowStart((start) => moveDayWindow(start, visibleDayCount, -1))}
+          disabled={!canNavigatePrevious}
+          className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
+        >
+          Previous
+        </button>
+        <div className="font-medium" aria-live="polite">{visibleDayRangeLabel}</div>
+        <button
+          type="button"
+          onClick={() => setDayWindowStart((start) => moveDayWindow(start, visibleDayCount, 1))}
+          disabled={!canNavigateNext}
+          className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
+        >
+          Next
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex h-full max-w-[1400px] gap-3 p-2 sm:p-4 xl:gap-4">
@@ -1365,29 +1391,6 @@ export default function App() {
               >
                 Erase
               </button>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              {canNavigateDayWindow ? (
-                <button
-                  type="button"
-                  onClick={() => setDayWindowStart((start) => moveDayWindow(start, visibleDayCount, -1))}
-                  disabled={!canNavigatePrevious}
-                  className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
-                >
-                  Previous
-                </button>
-              ) : null}
-              <div className="font-medium" aria-live="polite">{visibleDayRangeLabel}</div>
-              {canNavigateDayWindow ? (
-                <button
-                  type="button"
-                  onClick={() => setDayWindowStart((start) => moveDayWindow(start, visibleDayCount, 1))}
-                  disabled={!canNavigateNext}
-                  className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
-                >
-                  Next
-                </button>
-              ) : null}
             </div>
           </div>
 
@@ -1495,8 +1498,9 @@ export default function App() {
                 ))}
               </div>
             </div>
+            {renderDayNavigation()}
             <div className="mb-1 ml-1 mr-1 min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
-              <div ref={gridViewportRef} className="h-full overflow-auto">
+              <div ref={gridViewportRef} className="h-full overflow-auto [--time-column-width:64px] xl:[--time-column-width:84px]">
                 <div className="sticky top-0 z-10 grid overflow-hidden rounded-t-2xl bg-zinc-950/95 backdrop-blur" style={{ gridTemplateColumns }}>
                   <div ref={timeColumnHeaderRef} className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
                   {visibleDayIndices.map((dayIndex) => (

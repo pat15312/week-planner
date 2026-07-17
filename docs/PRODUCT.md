@@ -214,7 +214,7 @@ Useful indicators include:
 
 On 17 July 2026 the first responsive mobile and narrow-screen planner slice was approved and implemented.
 
-The planner shows a consecutive day window based on the measured width available for day columns. It shows at least three days, expands through four, five and six days when space permits, and shows the complete seven-day week when all days fit. Previous and Next controls move partial-week windows by one day and are disabled at the Monday and Sunday boundaries.
+The planner shows a consecutive day window based on the measured width available for day columns. It shows at least three days, expands through four, five and six days when space permits, and shows the complete seven-day week when all days fit. Previous and Next controls move partial-week windows by one day, are displayed whenever fewer than seven days are visible regardless of the activities-layout breakpoint, and are disabled at the Monday and Sunday boundaries.
 
 The grid keeps the time column visible beside the day columns and is intended to support viewports down to 375 CSS pixels without horizontal page scrolling. At and above 1280 CSS pixels, the established permanent activities sidebar remains visible.
 

@@ -446,6 +446,8 @@ The change included:
 - keeping the desktop layout on seven days with the established permanent activities sidebar
 - moving the activities interface into an overlay drawer on narrow screens while reusing the same activities panel implementation
 - keeping the selected activity and Paint or Erase tool visible in a compact narrow toolbar while the drawer is closed
+- rendering partial-week day navigation whenever fewer than seven days are visible, independent of the activities drawer breakpoint
+- restoring the 64px time column below `xl` and the established 84px time column at and above `xl`
 - adding pointer-event planner-cell handling so mouse drags edit only while the required button remains held, right-button drags erase, touch-style taps paint or erase once, and vertical movement cancels the pending edit for normal scrolling
 - preserving the existing storage keys, version 3 persisted payload schema, five-minute storage grid and grouped-block painting behaviour
 - adding focused Vitest coverage for visible day-count calculation, 3-to-7-day windows, previous and next movement, clamping, underlying day indices and mouse button-state predicates
