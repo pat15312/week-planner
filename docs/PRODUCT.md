@@ -209,3 +209,15 @@ Useful indicators include:
 - the interface is dependable and reversible
 - the product remains distinct from calendars and task managers
 - the codebase can evolve without repeatedly breaking established behaviour
+
+## Approved narrow-screen planner model
+
+On 17 July 2026 the first responsive mobile and narrow-screen planner slice was approved and implemented.
+
+The planner shows a consecutive day window based on the measured width available for day columns. It shows at least three days, expands through four, five and six days when space permits, and shows the complete seven-day week when all days fit. Previous and Next controls move partial-week windows by one day, are displayed whenever fewer than seven days are visible regardless of the activities-layout breakpoint, and are disabled at the Monday and Sunday boundaries.
+
+The grid keeps the time column visible beside the day columns and is intended to support viewports down to 375 CSS pixels without horizontal page scrolling. At and above 1280 CSS pixels, the established permanent activities sidebar remains visible.
+
+On narrow screens the activities sidebar becomes an overlay drawer opened from an Activities button. The drawer overlays the planner so the grid width is not reduced. While the drawer is closed, the selected activity and Paint or Erase tool remain visible in a compact toolbar.
+
+Touch editing is deliberately tap-based for this slice. A deliberate touch or pen tap on a displayed block paints or erases that whole displayed block, including the existing grouped 15-minute and 1-hour behaviour. Vertical swiping is reserved for normal grid scrolling and must not paint cells. Mouse dragging remains a per-interaction behaviour: editing continues only while the relevant mouse button is physically held, and right-button dragging erases.
