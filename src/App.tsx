@@ -82,6 +82,7 @@ import {
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TOUCH_TAP_MOVE_THRESHOLD_PX = 10;
+const TAILWIND_XL_MEDIA_QUERY = "(min-width: 1280px)";
 
 const PRESET_COLOURS = [
   "#E11D48",
@@ -180,6 +181,7 @@ export default function App() {
   const plannerAppRef = useRef<HTMLDivElement | null>(null);
   const activityDrawerPreviousFocusRef = useRef<HTMLElement | null>(null);
   const activityDrawerWasOpenRef = useRef(false);
+  const activityDrawerShouldRestoreFocusRef = useRef(true);
   const [narrowDayWindowStart, setNarrowDayWindowStart] = useState(0);
 
   // Grid view scale
@@ -251,7 +253,8 @@ export default function App() {
     setActivitiesDrawerOpen(true);
   }
 
-  function closeActivitiesDrawer() {
+  function closeActivitiesDrawer({ restoreFocus = true }: { restoreFocus?: boolean } = {}) {
+    activityDrawerShouldRestoreFocusRef.current = restoreFocus;
     setActivitiesDrawerOpen(false);
   }
 
@@ -348,6 +351,23 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [planModalOpen, importExportOpen, activitiesDrawerOpen]);
 
+
+  useEffect(() => {
+    const desktopQuery = window.matchMedia(TAILWIND_XL_MEDIA_QUERY);
+
+    const closeDrawerForDesktop = () => {
+      if (!desktopQuery.matches) return;
+      if (activitiesDrawerRef.current?.contains(document.activeElement)) {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      }
+      closeActivitiesDrawer({ restoreFocus: false });
+    };
+
+    closeDrawerForDesktop();
+    desktopQuery.addEventListener("change", closeDrawerForDesktop);
+    return () => desktopQuery.removeEventListener("change", closeDrawerForDesktop);
+  }, []);
+
   useEffect(() => {
     const background = plannerAppRef.current;
 
@@ -355,7 +375,9 @@ export default function App() {
       if (activityDrawerWasOpenRef.current) {
         activityDrawerWasOpenRef.current = false;
         background?.removeAttribute("inert");
-        restoreActivitiesDrawerFocus();
+        if (activityDrawerShouldRestoreFocusRef.current) restoreActivitiesDrawerFocus();
+        else activityDrawerPreviousFocusRef.current = null;
+        activityDrawerShouldRestoreFocusRef.current = true;
       }
       return;
     }
@@ -1218,7 +1240,7 @@ export default function App() {
               tabIndex={-1}
               className="absolute inset-0 h-full w-full bg-black/70"
               aria-label="Close activities drawer"
-              onClick={closeActivitiesDrawer}
+              onClick={() => closeActivitiesDrawer()}
             />
             <div
               ref={activitiesDrawerRef}
@@ -1229,7 +1251,7 @@ export default function App() {
                 <button
                   ref={activitiesDrawerCloseButtonRef}
                   type="button"
-                  onClick={closeActivitiesDrawer}
+                  onClick={() => closeActivitiesDrawer()}
                   className="flex items-center gap-2 rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800"
                 >
                   <X className="h-4 w-4" />
