@@ -41,17 +41,19 @@ npx playwright install --with-deps chromium webkit
 npm run test:e2e
 ```
 
-`npm run check` runs lint, unit tests and a production build. Browser tests then exercise that build. Use `npm run preview` to inspect it manually.
+`npm run check` runs lint, unit tests and a production build. Browser tests then exercise that build, run axe accessibility audits and check a large synthetic plan collection. Reports are retained as workflow artifacts. `npm run benchmark` measures the undo reducer separately from browser rendering and storage. Use `npm run preview` to inspect it manually.
 
 ## Browser and device targets
 
-The release-candidate test matrix covers Chromium and WebKit at 375, 768, 1024 and 1440 CSS pixels, including touch contexts. These represent phone, tablet and desktop layouts. Automated WebKit checks do not replace testing on an actual iPhone or iPad, particularly for touch scrolling, the virtual keyboard and file downloads.
+The automated test matrix covers Chromium and WebKit at 375, 768, 1024 and 1440 CSS pixels, including touch contexts. These represent phone, tablet and desktop layouts. Automated WebKit checks do not replace testing on an actual iPhone or iPad, particularly for touch scrolling, the virtual keyboard and file downloads.
 
 ## Deployment and releases
 
 Pull requests run the full quality checks. Main deploys to GitHub Pages only after lint, unit tests, build and browser tests pass. The Vite base remains `/week-planner/`.
 
-The package is currently `1.0.0-rc.1`. Before a final `v1.0.0` tag, complete the real-device checklist and review the release candidate. See [status](docs/STATUS.md).
+Version `1.0.0` is the first stable web release. A limited iPhone check was successful; physical iPad and full screen-reader acceptance remain outstanding. See [release notes](CHANGELOG.md) and [status](docs/STATUS.md).
+
+After a successful main deployment, the workflow creates a release for a new stable package version at that exact commit. Existing release tags are never moved. Prerelease package versions do not create stable releases.
 
 ## Project context
 
@@ -61,4 +63,4 @@ Week Planner remains distinct from calendars and task managers. Web development 
 
 ## Licence
 
-No software licence has been selected. Do not assume redistribution or reuse rights.
+MIT. See [LICENSE](LICENSE). Third-party dependencies retain their respective licences.

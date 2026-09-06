@@ -22,7 +22,14 @@ export function historyReducer(history: History, action: HistoryAction): History
     return next ? { present: next, past: [...history.past, history.present].slice(-50), future: history.future.slice(1), group: null } : history;
   }
   const present = typeof action.update === 'function' ? action.update(history.present) : action.update;
-  if (JSON.stringify(present) === JSON.stringify(history.present)) return history;
+  // Immutable edits share unchanged plans. Compare only replaced plans, avoiding
+  // serialising the entire collection twice for every pointer or keyboard edit.
+  if (present === history.present || (
+    present.activePlanId === history.present.activePlanId &&
+    present.plans.length === history.present.plans.length &&
+    present.plans.every((plan, index) => plan === history.present.plans[index] ||
+      JSON.stringify(plan) === JSON.stringify(history.present.plans[index]))
+  )) return history;
   if (action.transient) return { ...history, present, group: null };
   const sameGesture = action.group != null && action.group === history.group;
   return {

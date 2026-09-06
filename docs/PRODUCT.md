@@ -146,15 +146,7 @@ The sum of allocated and free time always represents the full 168-hour week when
 
 ## Current experience
 
-The existing design is:
-
-- dark
-- desktop-first
-- dense but visually structured
-- based around an activity sidebar and a large weekly grid
-- intended for precise pointer-based editing
-
-The present application should be treated as an established behavioural baseline, not a final mobile design.
+The existing design is dark and visually structured, with a weekly grid and an activity sidebar that becomes a drawer on smaller screens. It supports mouse, touch and keyboard editing. The hourly overview offers a starting point, with five-minute precision available when needed. Mobile comfort still benefits from real-device review.
 
 ## User-experience direction
 

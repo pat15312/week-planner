@@ -134,14 +134,14 @@ export function PlannerGrid({ plan, step, onPaint, beginGesture, endGesture }: P
     <div ref={viewport} className="planner-scroll min-h-0 flex-1 overflow-auto rounded-xl border border-zinc-800 bg-zinc-950" onScroll={() => { if (touch.current) touch.current.cancelled = true; }}>
       <div role="grid" aria-label="Weekly allocations" aria-describedby="grid-help" aria-rowcount={288 / step + 1} aria-colcount={8}>
         <div role="row" aria-rowindex={1} className="sticky top-0 z-10 grid bg-zinc-900" style={{ gridTemplateColumns: columns }}>
-          <div role="columnheader" className="px-1 py-3 text-xs text-zinc-400">Time</div>
+          <div role="columnheader" aria-colindex={1} className="px-1 py-3 text-xs text-zinc-400">Time</div>
           {days.map(day => <div role="columnheader" aria-colindex={day + 2} key={day} className="border-l border-zinc-800 px-2 py-3 text-sm font-medium">{DAYS[day]}</div>)}
         </div>
         {Array.from({ length: 288 / step }, (_, index) => {
           const row = index * step;
           const range = timeRangeLabel(row, step);
           return <div role="row" aria-rowindex={index + 2} key={row} className="grid" style={{ gridTemplateColumns: columns }}>
-            <div role="rowheader" className={`flex items-start px-1 pt-2 text-[11px] ${row % 12 === 0 ? 'text-zinc-200' : 'text-zinc-500'}`}>{range.slice(0, 5)}</div>
+            <div role="rowheader" aria-colindex={1} className={`flex items-start px-1 pt-2 text-[11px] ${row % 12 === 0 ? 'text-zinc-200' : 'text-zinc-400'}`}>{range.slice(0, 5)}</div>
             {days.map(day => {
               const summary = summariseGroupedBlock(plan.grid, day, row, step);
               const activity = summary.kind === 'single' ? activities.get(summary.activityId) : null;
