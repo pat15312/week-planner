@@ -18,7 +18,7 @@ Commands:
 - `npm run test:e2e`: Playwright journeys against the built app
 - `npm run preview`: preview the production bundle
 
-The test dependency Playwright is justified by browser event, focus, file and responsive-layout behaviour that pure function tests cannot exercise.
+Playwright covers browser event, focus, file and responsive-layout behaviour that pure function tests cannot exercise. The development-only `@axe-core/playwright` dependency adds automated accessibility checks; it is not bundled with the application.
 
 ## Responsibility boundaries
 
@@ -112,4 +112,16 @@ Vite base remains `/week-planner/`; the existing GitHub Pages origin is retained
 
 ## Remaining constraints
 
-No synchronisation, multi-tab conflict resolution or offline service worker is introduced. Large plan collections cause larger synchronous storage writes and history snapshots; the history bound limits growth but does not establish a performance guarantee. Real-device and assistive-technology acceptance remain required before declaring those experiences verified.
+No synchronisation, multi-tab conflict resolution or offline service worker is introduced. Large plan collections still require synchronous browser storage writes. The history bound limits growth but does not establish a device performance guarantee. Real-device and assistive-technology acceptance remain required before declaring those experiences verified.
+
+## Version 1.0 maintenance verification
+
+The icon picker exposes its expanded and selected states. Selecting an icon or pressing Escape returns focus to its trigger. Escape inside the picker does not also close the Activities drawer. Activity-name fields retain visible keyboard focus. The planner has a main landmark and a page heading at every viewport size; the time column has an explicit column index. Fine time labels use the higher-contrast secondary text colour.
+
+The accessibility suite audits the five-minute planner, expanded activity editor, icon picker, new-plan dialog and both backup modes using axe. Reports retain incomplete/manual checks as well as violations. Automated results are not a WCAG conformance claim.
+
+The stress journey uses synthetic data only: 50 plans, 100 activities per plan and 2,016 allocated cells per plan. It checks five-minute editing, undo, persistence, reload and preservation of an inactive plan. Browser timings are attached to test reports. The three-second ceiling catches severe CI regressions and is not a target for real-device latency.
+
+`npm run benchmark` measures the undo reducer on the same large shape, after 20 warm-up edits and over 100 measured edits. In the local Node 24.19.0 run, median comparison/edit time changed from 5.21 ms to 0.11 ms; p95 changed from 6.06 ms to 0.17 ms. These are domain timings, excluding React rendering and browser storage. The optimisation compares only replaced plans, taking advantage of immutable state sharing, while preserving content-based no-op detection and the 50-entry history limit.
+
+Stable release publication is the final job in `deploy-pages.yml`, after deployment succeeds. It reads the package version and the matching CHANGELOG section from the deployed SHA. It skips prerelease versions and already-published versions, refuses to move an existing tag, and creates a new release at the deployed commit. Only this job has repository-content write permission. It may remove the three named completed work branches only when each current branch head is covered by a merged pull request. Branches containing subsequent work are retained.

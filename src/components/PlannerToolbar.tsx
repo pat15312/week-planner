@@ -29,7 +29,7 @@ export function PlannerToolbar(props: Props) {
       </details>
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex gap-1" aria-label="Time resolution">
+      <div className="flex gap-1" role="group" aria-label="Time resolution">
         {(['60', '15', '5'] as const).map(scale => <button key={scale} className="action-button" aria-pressed={props.timeScale === scale} onClick={() => props.onScale(scale)}>{scale === '60' ? '1h' : `${scale}m`}</button>)}
       </div>
       <div className="flex gap-1">

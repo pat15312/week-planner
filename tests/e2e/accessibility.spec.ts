@@ -4,7 +4,7 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
 async function audit(page: Page, info: TestInfo, name: string) {
   const result = await new AxeBuilder({ page }).analyze();
   await info.attach(`accessibility-${name}`, { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
-  expect(result.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(n => ({ target: n.target, summary: n.failureSummary })) }))).toEqual([]);
+  expect.soft(result.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(n => ({ target: n.target, summary: n.failureSummary })) })), name).toEqual([]);
 }
 
 test('accessibility audit of planner, activity editor and dialogs', async ({ page }, info) => {

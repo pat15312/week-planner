@@ -874,7 +874,7 @@ export default function App() {
                             value={a.name}
                             onFocus={beginGesture} onBlur={endGesture}
                             onChange={(e) => updateActivity(a.id, { name: e.target.value })}
-                            className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
+                            className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 focus:ring-zinc-700"
                           />
                         </label>
 
@@ -898,7 +898,7 @@ export default function App() {
                             </div>
 
                             <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl bg-zinc-900 px-3 py-2 ring-1 ring-zinc-800">
-                              <div className="flex items-center gap-2">
+                              <label className="flex items-center gap-2">
                                 <input
                                   type="color"
                                   value={a.colour}
@@ -906,8 +906,8 @@ export default function App() {
                                   className="h-6 w-10 cursor-pointer rounded"
                                   title="Custom colour"
                                 />
-                                <span className="text-xs text-zinc-400">Custom</span>
-                              </div>
+                                <span className="text-xs text-zinc-400">Custom colour</span>
+                              </label>
                               <span className="text-xs text-zinc-400">{(a.colour ?? "").toUpperCase()}</span>
                             </div>
                           </div>
@@ -919,8 +919,10 @@ export default function App() {
                             <button
                               type="button"
                               data-icon-picker-button
+                              aria-label={`Icon: ${iconLabel(a.icon)}`}
+                              aria-expanded={openIconPickerFor === a.id}
                               onClick={() => setOpenIconPickerFor(openIconPickerFor === a.id ? null : a.id)}
-                              className="flex w-full items-center justify-between gap-2 rounded-2xl bg-zinc-950 px-3 py-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
+                              className="flex w-full items-center justify-between gap-2 rounded-2xl bg-zinc-950 px-3 py-2 text-sm ring-1 ring-zinc-800 focus:ring-zinc-700"
                             >
                               <div className="flex min-w-0 items-center gap-2">
                                 {(() => {
@@ -937,7 +939,14 @@ export default function App() {
                             </button>
 
                             {openIconPickerFor === a.id ? (
-                              <div data-icon-picker-root className="absolute right-0 z-30 mt-2 w-full rounded-2xl bg-zinc-950 p-2 ring-1 ring-zinc-800">
+                              <div data-icon-picker-root role="group" aria-label="Choose an icon"
+                                onKeyDown={event => {
+                                  if (event.key !== 'Escape') return;
+                                  event.stopPropagation();
+                                  event.currentTarget.parentElement?.querySelector<HTMLElement>('[data-icon-picker-button]')?.focus();
+                                  setOpenIconPickerFor(null);
+                                }}
+                                className="absolute right-0 z-30 mt-2 w-full rounded-2xl bg-zinc-950 p-2 ring-1 ring-zinc-800">
                                 <div className="grid grid-cols-6 gap-2">
                                   {ICONS.map((i) => {
                                     const I = i.Icon;
@@ -946,10 +955,12 @@ export default function App() {
                                       <button
                                         key={i.key}
                                         type="button"
-                                        onClick={() => {
+                                        onClick={event => {
+                                          event.currentTarget.closest('[data-icon-picker-root]')?.parentElement?.querySelector<HTMLElement>('[data-icon-picker-button]')?.focus();
                                           updateActivity(a.id, { icon: i.key });
                                           setOpenIconPickerFor(null);
                                         }}
+                                        aria-label={iconLabel(i.key)} aria-pressed={activeIcon}
                                         className={`flex items-center justify-center rounded-2xl px-2 py-3 ring-1 transition ${
                                           activeIcon ? "bg-zinc-900 ring-zinc-700" : "bg-zinc-950 ring-zinc-800 hover:bg-zinc-900 hover:ring-zinc-700"
                                         }`}
@@ -1096,11 +1107,11 @@ export default function App() {
           </div>
         ) : null}
 
-        <div ref={plannerAppRef} className="flex min-w-0 flex-1 flex-col overflow-hidden p-1">
-          <div className="mb-2 hidden shrink-0 flex-col items-center text-center sm:flex">
-            <div className="text-xl font-semibold tracking-tight sm:text-2xl">Week Planner</div>
-            <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
-          </div>
+        <main ref={plannerAppRef} className="flex min-w-0 flex-1 flex-col overflow-hidden p-1">
+          <header className="shrink-0 text-center sm:mb-2">
+            <h1 className="sr-only font-semibold tracking-tight sm:not-sr-only sm:text-2xl">Week Planner</h1>
+            <p className="hidden text-sm text-zinc-400 sm:block">Repeating weekly time plan, saved in your browser.</p>
+          </header>
           {storageWarning ? (
             <div className="mb-3 rounded-2xl bg-amber-950/60 px-3 py-2 text-sm text-amber-100 ring-1 ring-amber-800">
               {storageWarning}
@@ -1115,7 +1126,7 @@ export default function App() {
             <button className="action-button" aria-pressed={activePlan.tool === 'erase'} onClick={() => updateActivePlan({ tool: 'erase' }, true)}>Erase</button>
           </div>
 
-          <main className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
+          <section aria-label="Planner" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
             <PlannerToolbar plans={plans} plan={activePlan} onSelect={setActivePlanId} onPlanAction={openPlanModal}
               onExport={openExport} onImport={() => { setBackupMode('import'); setJsonBuffer(''); setJsonStatus(null); setImportExportOpen(true); }}
               timeScale={timeScale} onScale={setTimeScale} undo={undo} redo={redo} canUndo={history.canUndo} canRedo={history.canRedo} />
@@ -1124,11 +1135,11 @@ export default function App() {
         {importExportOpen && <BackupDialog recovery={!!startupRecovery} initialMode={backupMode} json={jsonBuffer} status={jsonStatus}
           setJson={setJsonBuffer} setStatus={setJsonStatus} onClose={() => setImportExportOpen(false)} onImport={applyImport}
           onRestore={restorePreviousPlans} canRestore={canRestorePreviousPlans} />}
-          </main>
+          </section>
 
           <footer className="mt-2 shrink-0 text-center text-xs text-zinc-400"><span role="status">{storageWarning ? 'Unsaved changes' : autoPersistenceEnabled ? 'Saved in this browser' : 'Saving unavailable'}</span> · <span>{formatMinutes(allocationSummary.freeMinutes)} free</span></footer>
           <p role="status" className="sr-only">{actionMessage}</p>
-        </div>
+        </main>
       </div>
 
       {planModalOpen && <Modal title={planModalTitle} onClose={() => setPlanModalOpen(false)}>

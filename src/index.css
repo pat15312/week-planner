@@ -11,6 +11,7 @@ button:disabled { cursor: default; opacity: .45; }
 .action-button { min-height: 44px; border: 1px solid #3f3f46; border-radius: 12px; background: #18181b; color: #fafafa; padding: 8px 12px; font-size: 14px; }
 .action-button:hover:not(:disabled) { background: #27272a; }
 .action-button.primary, .action-button[aria-pressed="true"] { background: #e0e7ff; border-color: #c7d2fe; color: #18181b; }
+.action-button.primary:hover:not(:disabled), .action-button[aria-pressed="true"]:hover:not(:disabled) { background: #c7d2fe; }
 .app-dialog { margin: auto; width: min(680px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; border: 1px solid #52525b; border-radius: 20px; padding: 20px; background: #09090b; color: #fafafa; box-shadow: 0 24px 80px #0008; }
 .app-dialog::backdrop { background: #000b; }
 .planner-scroll { overscroll-behavior: contain; scroll-padding-top: 48px; scrollbar-gutter: stable; }

@@ -51,4 +51,22 @@ describe('editing history', () => {
     for (let row = 0; row < 65; row++) history = historyReducer(history, { type: 'set', update: paint(row) });
     expect(history.past).toHaveLength(50);
   });
+  it('preserves redo when a replacement payload has identical content', () => {
+    let history = createHistory(initial());
+    history = historyReducer(history, { type: 'set', update: paint(0) });
+    history = historyReducer(history, { type: 'undo' });
+    const unchanged = historyReducer(history, { type: 'set', update: structuredClone(history.present) });
+    expect(unchanged).toBe(history);
+    expect(unchanged.future).toHaveLength(1);
+  });
+  it('recognises changes to a non-first plan and to plan order', () => {
+    const state = initial();
+    state.plans.push(makeDefaultPlan('Second'));
+    let history = createHistory(state);
+    history = historyReducer(history, { type: 'set', update: { ...state, plans: [state.plans[0], { ...state.plans[1], name: 'Changed' }] } });
+    expect(history.past).toHaveLength(1);
+    history = historyReducer(history, { type: 'set', update: p => ({ ...p, plans: [...p.plans].reverse() }) });
+    expect(history.past).toHaveLength(2);
+    expect(historyReducer(history, { type: 'undo' }).present.plans[0]).toBe(state.plans[0]);
+  });
 });

@@ -4,63 +4,48 @@ Last updated: 6 September 2026
 
 ## Current stage
 
-Version 1.0 release candidate. The existing React web application remains the product foundation. Native SwiftUI and synchronisation remain future work.
+Version 1.0.0 web application, with publication controlled by the deployment workflow. The project lead authorised finalising the first stable release and undertaking the maintenance review after a limited successful iPhone check. The existing React web app remains the product foundation.
 
-## Implemented in the release candidate
+The release workflow publishes a stable version only after its main deployment and all preceding checks succeed. The release tag and GitHub release are the authoritative publication record. See CHANGELOG.md for the user-facing release notes.
 
-- Fixed downward activity drops landing beyond the indicated gap.
-- Cancelled activity drags no longer commit a reorder.
-- Added Move up and Move down alternatives for touch and keyboard use.
-- Added bounded, session-only undo and redo for planner changes. Mouse paint gestures and activity-name editing sessions are grouped into single undo steps.
-- Added keyboard grid navigation, painting and erasing, readable cell labels and focus indication.
-- Added accessible native modal dialogs with focus containment and restoration.
-- Added JSON file download and upload alongside copy and paste, with clipboard failure reporting.
-- Preserved schema version 3, existing storage and pre-import backup keys, validation and recovery.
-- Added separately versioned view preferences, with the hourly overview as the initial default.
-- Increased touch cell heights to at least 44 CSS pixels, retained swipe scrolling and tap editing, and added a time jump control.
-- Simplified narrow-screen controls and retained the approved minimum three-day model.
-- Added visible scrollbars, dynamic viewport height and a mobile free-time summary.
-- Extracted grid, toolbar, backup dialog, shared modal and history responsibilities from App.tsx.
-- Replaced starter branding and standardised Node.js through .nvmrc.
-- Added browser regression tests and made them part of pull-request and deployment checks.
+## Completed work
 
-## Verification
+- Reversible planner editing, keyboard grid controls, file backups and recovery.
+- Responsive three-to-seven-day layout, touch editing, activity drawer and time jumping.
+- Extracted domain, storage, grid, toolbar, backup, dialog and history responsibilities.
+- Version 1.0.0 package metadata, MIT licence and release notes.
+- Release automation tied to the successfully deployed main revision, with existing tags preserved.
+- Accessibility regression audits using axe, including the fine grid, activity editor, icon picker and plan/backup dialogs.
+- Fixed icon-picker focus loss, selected-button hover contrast, faint time labels, missing page semantics and suppressed input focus indication.
+- Large synthetic collection checks covering 50 plans and 100 activities per plan.
+- Optimised history comparisons to avoid serialising unchanged plans on every edit.
+- Guarded cleanup of named completed work branches after release publication. Branches whose current heads are not covered by a merged PR are retained.
 
-Local checks completed during implementation:
+## Verification evidence and limits
 
-- dependency installation
-- linting
-- 87 unit tests
-- production build
+The project lead reported that the app seemed OK on an iPhone, while explicitly describing the testing as limited. This is recorded as a limited successful check, not full device acceptance. Physical iPad and full VoiceOver/screen-reader testing remain outstanding.
 
-Browser checks are run through GitHub Actions against the production build. Results are recorded on the pull request and in the browser-results workflow artifact. The matrix covers Chromium and WebKit at 375, 768, 1024 and 1440 CSS pixels, including touch contexts.
+Local lint, all 89 unit tests, TypeScript and production build pass. The unit suite includes planner, persistence and history checks. Browser CI covers Chromium and WebKit at 375, 768, 1024 and 1440 CSS pixels, including touch contexts. Accessibility and performance results are attached to browser reports. The final checks are recorded on pull request #10 and the main deployment workflow.
 
-A cloud browser could open the existing public deployment but could not connect to the local development server. This is an environment limitation. Real iPhone and iPad hardware have not been tested in this session.
+The normal local browser download endpoint timed out. Local Chromium checks use an isolated temporary Chromium 149 executable; it is not an application dependency. GitHub Actions uses the configured Playwright Chromium and WebKit engines and remains the release gate.
 
-## Release gate
+A local Node 24.19.0 benchmark measured history edit/comparison median time falling from 5.21 ms to 0.11 ms for 50 plans with 100 activities each. This excludes rendering and browser storage. See TECHNICAL.md for the method and repeatable command.
 
-Before labelling version 1.0 final:
+## Maintenance decisions
 
-1. Require a successful pull-request workflow, including browser journeys.
-2. Review screenshots at phone, tablet and desktop sizes.
-3. Verify actual iPhone/iPad scrolling, touch reordering, virtual-keyboard behaviour and backup downloads.
-4. Review the prepared change before merging. Main deploys automatically after all checks pass.
-5. Replace the release-candidate version with 1.0.0 and create the v1.0.0 release tag on the verified main commit.
+- Keep schema version 3 and both existing storage keys. There is no migration in this release. Future schema changes require historical fixtures, validation, migration and recovery tests.
+- Keep the activity editor in App.tsx until an actual feature or maintenance need justifies extraction. No broad refactor is required to deliver the audited fixes.
+- No current usage evidence justifies cross-tab conflict handling. Keep it as a documented constraint and revisit if simultaneous-tab use becomes a requirement.
+- Native SwiftUI, device synchronisation, iCloud and product expansion remain future decisions.
 
 ## Remaining limitations
 
-- Plans are local to a browser. Clearing browser data removes them unless an external backup exists.
-- There is no cross-tab conflict handling or device synchronisation.
-- Undo history is limited to 50 changes and is cleared on reload or successful import/restore/reset. A pre-import backup remains the recovery path across those boundaries.
-- A browser engine test does not establish real-device comfort or full screen-reader conformance.
-- No software licence has been selected. Do not infer redistribution rights.
+- Plans belong to a browser. Clearing browser data removes them unless an external backup exists.
+- There is no cross-tab conflict resolution, cross-device synchronisation or offline service worker.
+- Undo history is limited to 50 changes and clears on reload or successful import/restore/reset.
+- Automated accessibility checks do not prove screen-reader conformance, and touch simulation does not prove real-device comfort.
+- Large collections still cause synchronous browser storage writes; the synthetic benchmark is not a mobile performance guarantee.
 
-## Approved direction
+## Next priorities
 
-The project lead approved implementing the review recommendations on 6 September 2026, with particular attention to mobile usability. This includes the hourly initial view, remembered scale, reversible editing, keyboard accessibility and file backups.
-
-The existing versioned storage key is deliberately retained. A future data-format change must include a tested migration. No migration is needed for this release because the plan format is unchanged.
-
-## Next task
-
-Complete release-candidate verification, address concrete findings and obtain the project lead's review of the finished interface before the final release.
+Record any defects encountered in normal use and fix them in small patches. Complete broader iPhone/iPad and assistive-technology acceptance when devices are available. After several weeks of use, review which editing or comparison improvements would most help intentional allocation before approving new features.
