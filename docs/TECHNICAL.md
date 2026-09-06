@@ -116,7 +116,7 @@ No synchronisation, multi-tab conflict resolution or offline service worker is i
 
 ## Version 1.0 maintenance verification
 
-The icon picker exposes its expanded and selected states. Selecting an icon or pressing Escape returns focus to its trigger. Escape inside the picker does not also close the Activities drawer. Activity-name fields retain visible keyboard focus. The planner has a main landmark and a page heading at every viewport size; the time column has an explicit column index. Fine time labels use the higher-contrast secondary text colour.
+The icon picker exposes its expanded and selected states. Selecting an icon or pressing Escape returns focus to its trigger. Escape inside the picker does not also close the Activities drawer. Activity-name fields retain visible keyboard focus. The planner has a main landmark and a page heading at every viewport size; the time column has an explicit column index. Fine time labels use the higher-contrast secondary text colour. Grid cells establish a positioning boundary for their visually hidden labels, preventing off-screen rows from extending the document below the app. Responsive regressions check both horizontal and vertical page overflow.
 
 The accessibility suite audits the five-minute planner, expanded activity editor, icon picker, new-plan dialog and both backup modes using axe. Reports retain incomplete/manual checks as well as violations. Automated results are not a WCAG conformance claim.
 

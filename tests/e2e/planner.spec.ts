@@ -119,6 +119,9 @@ test('layout fits, day navigation preserves data and touch targets are large', a
     await page.getByRole('button', { name: '5m', exact: true }).click();
     expect((await page.getByRole('gridcell').first().boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
+  // Hidden cell labels must stay inside the scrolling grid, rather than
+  // extending the document into a blank page below the app in fine view.
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('planner.png'), fullPage: true });
   await activities(page);
   await page.getByRole('button', { name: 'Edit Work', exact: true }).click();

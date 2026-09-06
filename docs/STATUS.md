@@ -17,6 +17,7 @@ The release workflow publishes a stable version only after its main deployment a
 - Release automation tied to the successfully deployed main revision, with existing tags preserved.
 - Accessibility regression audits using axe, including the fine grid, activity editor, icon picker and plan/backup dialogs.
 - Fixed icon-picker focus loss, selected-button hover contrast, faint time labels, missing page semantics and suppressed input focus indication.
+- Contained hidden grid labels within cells to prevent blank page overflow in fine view, with a vertical-overflow regression check.
 - Large synthetic collection checks covering 50 plans and 100 activities per plan.
 - Optimised history comparisons to avoid serialising unchanged plans on every edit.
 - Guarded cleanup of named completed work branches after release publication. Branches whose current heads are not covered by a merged PR are retained.

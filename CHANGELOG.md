@@ -25,6 +25,7 @@ First stable web release of Week Planner, a browser-local visual planner for a r
 
 - Automated accessibility audits of the fine grid, activity editor, icon picker and plan/backup dialogs.
 - Improved time-label contrast, landmarks, keyboard focus and icon-picker announcements.
+- Prevented hidden grid labels from creating blank page overflow below the planner.
 - Stress coverage for 50 plans with 100 activities per plan, including editing, undo, persistence and reload.
 - Reduced undo comparison work by checking changed plans instead of serialising the entire collection twice.
 
