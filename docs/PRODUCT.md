@@ -135,6 +135,9 @@ The sum of allocated and free time always represents the full 168-hour week when
 ### Store and move data
 
 - save plans automatically in the current browser
+- undo and redo recent edits within the current session
+- download all plans as a JSON backup file and import a backup file
+- remember the selected time scale on this device
 - export all plans as JSON
 - import a valid version 3 JSON set of plans
 - reject invalid imports without replacing current plans
@@ -221,3 +224,19 @@ The grid keeps the time column visible beside the day columns and is intended to
 On narrow screens the activities sidebar becomes an overlay drawer opened from an Activities button. The drawer overlays the planner so the grid width is not reduced. While the drawer is closed, the selected activity and Paint or Erase tool remain visible in a compact toolbar.
 
 Touch editing is deliberately tap-based for this slice. A deliberate touch or pen tap on a displayed block paints or erases that whole displayed block, including the existing grouped 15-minute and 1-hour behaviour. Vertical swiping is reserved for normal grid scrolling and must not paint cells. Mouse dragging remains a per-interaction behaviour: editing continues only while the relevant mouse button is physically held, and right-button dragging erases.
+
+## Approved release-candidate experience, 6 September 2026
+
+The project lead approved completion of the review recommendations, with mobile usability as an explicit priority.
+
+A new installation starts with the hourly overview. The selected scale is remembered separately from plan data. Five-minute precision remains available. A time jump control and visible scrollbars help users reach any part of the day.
+
+The three-to-seven-day model and tap-to-edit, swipe-to-scroll distinction remain. Touch cells are at least 44 CSS pixels tall, including fine resolution. Selecting an activity closes the mobile drawer. Activity editors offer Move up and Move down controls in addition to dragging.
+
+Undo and redo reverse recent plan and activity changes. A mouse paint gesture is one undo operation. History contains up to 50 changes and lasts until reload or a successful import, restore or reset. Existing pre-import backup recovery remains available separately.
+
+The weekly grid supports keyboard navigation, painting and erasing. Cells expose time and activity labels, including mixed allocations. Plan and backup dialogs contain focus and return it when closed.
+
+Plan options contains creation, renaming, duplication, deletion and distinct Export backup and Import backup actions. Backup files provide the primary portable-data workflow; JSON copy and paste remain available. Feedback must report actual copy failures and warn when saving fails.
+
+Version 1.0 is ready when users can create a meaningful week, edit it comfortably on agreed devices, reverse mistakes, preserve and restore their plans, and receive updates without losing data. Real-device verification remains necessary alongside browser automation.

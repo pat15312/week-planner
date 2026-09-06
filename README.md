@@ -1,120 +1,64 @@
 # Week Planner
 
-Week Planner is a local-first, visual time allocation application for designing a repeating week.
+A private, visual time allocation app for designing your repeating 168-hour week.
 
-Every week contains 168 hours. Week Planner helps a user decide intentionally how those hours should be allocated before they are consumed by default.
+[Open Week Planner](https://pat15312.github.io/week-planner/)
 
-It is not intended to become a calendar, task manager or project management system. Its purpose is to make priorities visible across the whole week.
+## Plan your week
 
-## Current capabilities
+1. Select an activity and tap or paint the time you want to allocate.
+2. Start with the hourly overview, then use 15-minute or five-minute precision where needed.
+3. Use Undo and Redo to revise your plan, and check activity totals and free time.
+4. Open Plan options to create alternative weeks or export a backup.
 
-The current web application supports:
+On phones, open Activities to select or edit an activity. Tap cells to edit and swipe the grid to scroll. Previous and Next move between visible days. Jump to time takes you directly to an hour. Move up and Move down in an activity editor offer an alternative to dragging.
 
-- multiple named weekly plans
-- a seven-day planning grid
-- allocation in five-minute units
-- 5-minute, 15-minute and 1-hour views
-- custom activities with names, colours and icons
-- paint and erase tools
-- drag-to-reorder activities
-- total allocated time for each activity
-- a calculated free-time total
-- duplication, renaming and deletion of plans
-- JSON export and import
-- automatic saving in the browser
+Keyboard users can tab into the grid and use arrow keys to move, Enter or Space to paint, and Delete to erase. Ctrl/Command Z undoes a change; Ctrl/Command Shift Z redoes it.
 
-## Technology
+## Your data
 
-The application currently uses:
+Plans are automatically saved in the current browser, without an account or backend. Export backup downloads all plans as a portable JSON file. Import backup validates a file before replacement and preserves a pre-import copy that you can restore.
 
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- Lucide icons
+Clearing browser data, switching browser profiles or changing device does not transfer your plans. Keep an external backup. Undo history lasts for the current session, up to 50 changes. Reloading or successfully importing/restoring plans clears undo history.
 
-It is a client-side application. There is currently no account system, server-side application, database or cloud synchronisation service.
+This release preserves the existing version 3 plan format and storage keys.
 
-## Getting started
+## Development
 
-### Requirements
-
-Install a current Node.js release and npm.
-
-The repository does not yet pin a specific Node.js version for local development. GitHub Pages deployment currently uses Node.js 20.
-
-### Install dependencies
+Use Node.js 24.19.0, pinned in `.nvmrc`:
 
 ```bash
-npm install
-```
-
-### Run the development server
-
-```bash
+nvm use
+npm ci
 npm run dev
 ```
 
-### Run linting
+Quality checks:
 
 ```bash
-npm run lint
+npm run check
+npx playwright install --with-deps chromium webkit
+npm run test:e2e
 ```
 
-### Create a production build
+`npm run check` runs lint, unit tests and a production build. Browser tests then exercise that build. Use `npm run preview` to inspect it manually.
 
-```bash
-npm run build
-```
+## Browser and device targets
 
-### Preview the production build
+The release-candidate test matrix covers Chromium and WebKit at 375, 768, 1024 and 1440 CSS pixels, including touch contexts. These represent phone, tablet and desktop layouts. Automated WebKit checks do not replace testing on an actual iPhone or iPad, particularly for touch scrolling, the virtual keyboard and file downloads.
 
-```bash
-npm run preview
-```
+## Deployment and releases
 
-## Data and privacy
+Pull requests run the full quality checks. Main deploys to GitHub Pages only after lint, unit tests, build and browser tests pass. The Vite base remains `/week-planner/`.
 
-Week Planner stores plans in the user's browser using `localStorage`.
+The package is currently `1.0.0-rc.1`. Before a final `v1.0.0` tag, complete the real-device checklist and review the release candidate. See [status](docs/STATUS.md).
 
-Clearing browser data, changing browser profile, changing the deployed origin or using a different device may make locally stored plans unavailable. Users can copy their data through the application's JSON export function.
+## Project context
 
-Imported JSON must be treated as untrusted data and validated before it replaces existing plans. See [Technical context](docs/TECHNICAL.md) for the current storage format, known risks and migration direction.
+Read [AGENTS.md](AGENTS.md), [HUMAN.md](HUMAN.md), [product](docs/PRODUCT.md), [technical context](docs/TECHNICAL.md) and [status](docs/STATUS.md) before changes.
 
-## Deployment
-
-The web application is live at:
-
-https://pat15312.github.io/week-planner/
-
-Deployment is performed through GitHub Actions using [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). See [Technical context](docs/TECHNICAL.md) for the verified workflow and current deployment checks.
-
-## Project documentation
-
-Before making changes, read:
-
-1. [AGENTS.md](AGENTS.md)
-2. [HUMAN.md](HUMAN.md)
-3. [docs/PRODUCT.md](docs/PRODUCT.md)
-4. [docs/TECHNICAL.md](docs/TECHNICAL.md)
-5. [docs/STATUS.md](docs/STATUS.md)
-
-Each document has a distinct responsibility:
-
-- `AGENTS.md` explains how coding agents should work on the repository.
-- `HUMAN.md` explains how an AI collaborator should work with the human project lead.
-- `PRODUCT.md` is the source of truth for product purpose, boundaries and experience.
-- `TECHNICAL.md` is the source of truth for architecture, data and engineering constraints.
-- `STATUS.md` records the current state, priorities, decisions and next work.
-
-## Project status
-
-The existing application is a working product and should not be treated as disposable scaffolding.
-
-The immediate objective is to strengthen the web application and establish an effective Codex development workflow. A native SwiftUI application is a longer-term direction, not the current implementation task.
-
-See [docs/STATUS.md](docs/STATUS.md) for current priorities and known issues.
+Week Planner remains distinct from calendars and task managers. Web development precedes any native SwiftUI version.
 
 ## Licence
 
-No software licence is currently declared in the repository. Do not assume permission for redistribution or reuse until a licence is deliberately selected and added.
+No software licence has been selected. Do not assume redistribution or reuse rights.

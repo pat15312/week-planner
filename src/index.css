@@ -1,14 +1,28 @@
 @import "tailwindcss";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-/* Hidden scrollbars - maintains scroll functionality */
-* {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+:root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; background: #09090b; }
+* { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: #52525b #18181b; }
+body { margin: 0; }
+button, input, select, textarea { font: inherit; }
+button, summary { cursor: pointer; }
+button:disabled { cursor: default; opacity: .45; }
+:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 3px; }
+.app-shell { height: 100vh; height: 100dvh; min-height: 480px; padding-bottom: env(safe-area-inset-bottom); }
+.action-button { min-height: 44px; border: 1px solid #3f3f46; border-radius: 12px; background: #18181b; color: #fafafa; padding: 8px 12px; font-size: 14px; }
+.action-button:hover:not(:disabled) { background: #27272a; }
+.action-button.primary, .action-button[aria-pressed="true"] { background: #e0e7ff; border-color: #c7d2fe; color: #18181b; }
+.app-dialog { margin: auto; width: min(680px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; border: 1px solid #52525b; border-radius: 20px; padding: 20px; background: #09090b; color: #fafafa; box-shadow: 0 24px 80px #0008; }
+.app-dialog::backdrop { background: #000b; }
+.planner-scroll { overscroll-behavior: contain; scroll-padding-top: 48px; scrollbar-gutter: stable; }
+.planner-cell { overflow: hidden; min-width: 0; scroll-margin-top: 48px; }
+.planner-cell:focus-visible { outline-offset: -3px; position: relative; z-index: 1; }
+.fine-cell { min-height: 28px; }
+.quarter-cell { min-height: 36px; }
+.hour-cell { min-height: 44px; }
+.drag-handle { min-height: 44px; min-width: 32px; }
+@media (pointer: coarse), (max-width: 767px) {
+  .planner-cell { min-height: 44px; }
+  input, select, textarea { font-size: 16px; }
+  .app-dialog { padding: 16px; }
 }
-
-*::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
-}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }

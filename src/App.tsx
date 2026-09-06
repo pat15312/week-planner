@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { PlannerToolbar } from './components/PlannerToolbar';
+import { PlannerGrid } from './components/PlannerGrid';
+import { Modal } from './components/Modal';
+import { BackupDialog } from './components/BackupDialog';
+import { usePlannerHistory } from './hooks/usePlannerHistory';
+import { readTimeScale, writeTimeScale } from './domain/preferences';
 import {
   Plus,
-  Download,
-  Upload,
-  Paintbrush,
-  Eraser,
   Calendar,
   Coffee,
   Dumbbell,
@@ -22,18 +24,14 @@ import {
   Gamepad2,
   Droplets,
   Route,
-  Copy,
   GripVertical,
   ChevronDown,
   ChevronUp,
   X,
-  Trash2,
-  Menu,
 } from "lucide-react";
 import {
   addPlanAndSelect,
   calculateAllocationSummary,
-  CELLS_PER_DAY,
   clearGridForActivity,
   formatMinutes,
   hexWithAlpha,
@@ -41,23 +39,12 @@ import {
   deletePlanAndSelectFallback,
   duplicatePlanAndSelect,
   makeDefaultPlan,
-  calculateVisibleDayCount,
-  clampDayWindowStart,
-  dayWindowIndices,
-  clearEndedMouseDragInteraction,
-  isMouseDragButtonHeld,
-  moveDayWindow,
-  type MouseDragButton,
   renamePlan,
   reorderByIndex,
-  summariseGroupedBlock,
-  timeLabelForRow,
-  timeRangeLabel,
   uid,
   updateGridRange,
   type Activity,
   type Plan,
-  type ToolMode,
 } from "./domain/planner";
 import {
   PRE_IMPORT_BACKUP_KEY,
@@ -85,10 +72,14 @@ import {
 // - Right click ALWAYS erases
 // - Planner grid shows a 3-to-7-day window based on measured available width
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const TOUCH_TAP_MOVE_THRESHOLD_PX = 10;
 const TAILWIND_XL_MEDIA_QUERY = "(min-width: 1280px)";
-const FALLBACK_TIME_COLUMN_WIDTH_PX = 64;
+// Resolve storage inside the guarded persistence helpers, including browsers
+// where obtaining window.localStorage itself throws.
+const browserStorage = {
+  getItem: (key: string) => window.localStorage.getItem(key),
+  setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
+  removeItem: (key: string) => window.localStorage.removeItem(key),
+};
 
 const PRESET_COLOURS = [
   "#E11D48",
@@ -142,7 +133,7 @@ function getIconComponent(iconKey: string) {
 type PlanModalMode = "new" | "rename" | "duplicate" | "delete";
 
 export default function App() {
-  const [startup] = useState(() => loadStartupState(localStorage, makeDefaultPlan("Default")));
+  const [startup] = useState(() => loadStartupState(browserStorage, makeDefaultPlan("Default")));
   const [startupRecovery, setStartupRecovery] = useState<{ originalText: string; error: string } | null>(
     startup.status === "recovery" ? { originalText: startup.originalText, error: startup.error } : null
   );
@@ -151,23 +142,19 @@ export default function App() {
   const [canRestorePreviousPlans, setCanRestorePreviousPlans] = useState(false);
   const [resetConfirmation, setResetConfirmation] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState<{ type: "ok" | "error"; message: string } | null>(null);
-  const [{ plans, activePlanId }, setPlannerState] = useState(startup.state);
-
-  const setPlans: React.Dispatch<React.SetStateAction<Plan[]>> = (value) => {
-    setPlannerState((prev) => ({
-      ...prev,
-      plans: typeof value === "function" ? value(prev.plans) : value,
-    }));
-  };
+  const history = usePlannerHistory(startup.state);
+  const { state: { plans, activePlanId }, setState: setPlannerState, beginGesture, endGesture, undo, redo } = history;
+  const [actionMessage, setActionMessage] = useState('');
 
   const setActivePlanId: React.Dispatch<React.SetStateAction<string | null>> = (value) => {
     setPlannerState((prev) => ({
       ...prev,
       activePlanId: typeof value === "function" ? value(prev.activePlanId) : value,
-    }));
+    }), true);
   };
 
   const [importExportOpen, setImportExportOpen] = useState(false);
+  const [backupMode, setBackupMode] = useState<"export" | "import">("export");
   const [jsonBuffer, setJsonBuffer] = useState("");
   const [jsonStatus, setJsonStatus] = useState<{ type: "ok" | "error"; message: string } | null>(null);
 
@@ -188,19 +175,11 @@ export default function App() {
   const activityDrawerPreviousFocusRef = useRef<HTMLElement | null>(null);
   const activityDrawerWasOpenRef = useRef(false);
   const activityDrawerShouldRestoreFocusRef = useRef(true);
-  const [dayWindowStart, setDayWindowStart] = useState(0);
-  const [visibleDayCount, setVisibleDayCount] = useState(3);
-  const gridViewportRef = useRef<HTMLDivElement | null>(null);
-  const timeColumnHeaderRef = useRef<HTMLDivElement | null>(null);
-
-  // Grid view scale
-  const [timeScale, setTimeScale] = useState<"5" | "15" | "60">("5");
+  const [timeScale, setTimeScale] = useState(readTimeScale);
   const viewStep = timeScale === "5" ? 1 : timeScale === "15" ? 3 : 12;
-
-  // Painting state
-  const activeMouseDragRef = useRef<{ pointerId: number; button: MouseDragButton; mode: ToolMode } | null>(null);
-  const lastPaintRef = useRef<{ day: number | null; row: number | null }>({ day: null, row: null });
-  const pendingTouchEditRef = useRef<{ pointerId: number; dayIndex: number; startRow: number; startX: number; startY: number; cancelled: boolean } | null>(null);
+  useEffect(() => {
+    if (!writeTimeScale(timeScale)) setActionMessage('View preference could not be saved in this browser.');
+  }, [timeScale]);
 
   // Pointer-based activity reordering
   const activityRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -297,7 +276,7 @@ export default function App() {
   // Persist to storage
   useEffect(() => {
     if (!plans || plans.length === 0 || startupRecovery || !autoPersistenceEnabled) return;
-    const saved = savePayload(localStorage, STORAGE_KEY, createPlannerPayload(plans, activePlanId));
+    const saved = savePayload(browserStorage, STORAGE_KEY, createPlannerPayload(plans, activePlanId));
     setStorageWarning(saved.ok ? null : "Changes are not being saved because browser storage is unavailable. Export your plans to keep a copy.");
   }, [plans, activePlanId, startupRecovery, autoPersistenceEnabled]);
 
@@ -313,38 +292,6 @@ export default function App() {
     }
   }, [importExportOpen, startupRecovery]);
 
-  // Keep activePlanId valid
-  useEffect(() => {
-    if (!plans || plans.length === 0) return;
-    if (!activePlanId || !plans.some((p) => p.id === activePlanId)) setActivePlanId(plans[0].id);
-  }, [plans, activePlanId]);
-
-  function clearMouseDrag() {
-    activeMouseDragRef.current = null;
-    lastPaintRef.current = { day: null, row: null };
-  }
-
-  // Global pointer cleanup ends mouse painting even when release happens outside the grid.
-  useEffect(() => {
-    const onPointerEnd = (e: PointerEvent) => {
-      const nextDrag = clearEndedMouseDragInteraction(activeMouseDragRef.current, { kind: "pointerend", pointerId: e.pointerId });
-      if (nextDrag === activeMouseDragRef.current) return;
-      clearMouseDrag();
-    };
-    const onBlur = () => {
-      if (clearEndedMouseDragInteraction(activeMouseDragRef.current, { kind: "blur" }) === null) clearMouseDrag();
-    };
-
-    window.addEventListener("pointerup", onPointerEnd);
-    window.addEventListener("pointercancel", onPointerEnd);
-    window.addEventListener("blur", onBlur);
-    return () => {
-      window.removeEventListener("pointerup", onPointerEnd);
-      window.removeEventListener("pointercancel", onPointerEnd);
-      window.removeEventListener("blur", onBlur);
-    };
-  }, []);
-
   // Click outside icon picker closes it
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -357,19 +304,19 @@ export default function App() {
     return () => window.removeEventListener("mousedown", onDown);
   }, []);
 
-  // Escape closes modals and the narrow activities drawer
   useEffect(() => {
-    if (!planModalOpen && !importExportOpen && !activitiesDrawerOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setPlanModalOpen(false);
-      setImportExportOpen(false);
-      closeActivitiesDrawer();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && activitiesDrawerOpen) closeActivitiesDrawer();
+      const target = event.target;
+      if (planModalOpen || importExportOpen || (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]'))) return;
+      if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+        if (event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
+        if (event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); }
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [planModalOpen, importExportOpen, activitiesDrawerOpen]);
-
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activitiesDrawerOpen, planModalOpen, importExportOpen, undo, redo]);
 
   useEffect(() => {
     const desktopQuery = window.matchMedia(TAILWIND_XL_MEDIA_QUERY);
@@ -419,166 +366,21 @@ export default function App() {
     setPendingClearActivityId(null);
   }, [activePlan?.id]);
 
-  function updateActivePlan(patchOrUpdater: Partial<Plan> | ((p: Plan) => Partial<Plan>)) {
-    setPlans((prev) => {
+  function updateActivePlan(patchOrUpdater: Partial<Plan> | ((p: Plan) => Partial<Plan>), transient = false) {
+    setPlannerState((state) => {
+      const prev = state.plans;
       const idx = prev.findIndex((p) => p.id === activePlan.id);
-      if (idx < 0) return prev;
+      if (idx < 0) return state;
       const next = prev.slice();
       const current = next[idx];
       const patch = typeof patchOrUpdater === "function" ? patchOrUpdater(current) : patchOrUpdater;
       next[idx] = { ...current, ...patch };
-      return next;
-    });
+      return { ...state, plans: next };
+    }, transient);
   }
-
-  const activityById = useMemo(() => {
-    const m = new Map<string, Activity>();
-    for (const a of activePlan.activities) m.set(a.id, a);
-    return m;
-  }, [activePlan.activities]);
 
   const allocationSummary = useMemo(() => calculateAllocationSummary(activePlan), [activePlan]);
-  const visibleDayIndices = useMemo(() => dayWindowIndices(dayWindowStart, visibleDayCount), [dayWindowStart, visibleDayCount]);
-  const visibleDayRangeLabel = `${DAYS[visibleDayIndices[0]]}–${DAYS[visibleDayIndices[visibleDayIndices.length - 1]]}`;
-  const selectedActivity = activePlan.activities.find((activity) => activity.id === activePlan.selectedActivityId) ?? null;
-  const canNavigateDayWindow = visibleDayCount < DAYS.length;
-  const canNavigatePrevious = dayWindowStart > 0;
-  const canNavigateNext = dayWindowStart + visibleDayCount < DAYS.length;
-  const gridTemplateColumns = `var(--time-column-width) repeat(${visibleDayCount}, minmax(0, 1fr))`;
-
-  useEffect(() => {
-    const viewport = gridViewportRef.current;
-    if (!viewport) return;
-
-    const updateVisibleDayCount = () => {
-      const timeColumnWidth = timeColumnHeaderRef.current?.getBoundingClientRect().width ?? FALLBACK_TIME_COLUMN_WIDTH_PX;
-      const availableDayColumnWidth = viewport.getBoundingClientRect().width - timeColumnWidth;
-      setVisibleDayCount(calculateVisibleDayCount(availableDayColumnWidth));
-    };
-
-    updateVisibleDayCount();
-    const resizeObserver = new ResizeObserver(updateVisibleDayCount);
-    resizeObserver.observe(viewport);
-    if (timeColumnHeaderRef.current) resizeObserver.observe(timeColumnHeaderRef.current);
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  useEffect(() => {
-    setDayWindowStart((start) => clampDayWindowStart(start, visibleDayCount));
-  }, [visibleDayCount]);
-
-  function applyRange(dayIndex: number, startRow: number, len: number, activityIdOrNull: string | null) {
-    updateActivePlan((p) => ({ grid: updateGridRange(p.grid, dayIndex, startRow, len, activityIdOrNull) }));
-  }
-
-  function applyActiveToolOnce(dayIndex: number, startRow: number, forcedMode?: ToolMode) {
-    const mode = forcedMode ?? activePlan.tool;
-    if (mode === "erase") applyRange(dayIndex, startRow, viewStep, null);
-    else applyRange(dayIndex, startRow, viewStep, activePlan.selectedActivityId ?? null);
-  }
-
-  function onCellPointerEnter(e: React.PointerEvent, dayIndex: number, startRow: number) {
-    if (e.pointerType !== "mouse") return;
-    const activeDrag = activeMouseDragRef.current;
-    if (!activeDrag || activeDrag.pointerId !== e.pointerId) return;
-    if (!isMouseDragButtonHeld(e.buttons, activeDrag.button)) {
-      clearMouseDrag();
-      return;
-    }
-
-    const last = lastPaintRef.current;
-    if (last.day === dayIndex && last.row === startRow) return;
-    lastPaintRef.current = { day: dayIndex, row: startRow };
-    applyActiveToolOnce(dayIndex, startRow, activeDrag.mode);
-  }
-
-  function onCellPointerDown(e: React.PointerEvent, dayIndex: number, startRow: number) {
-    if (e.pointerType === "touch" || e.pointerType === "pen") {
-      if (e.button !== 0) return;
-      pendingTouchEditRef.current = { pointerId: e.pointerId, dayIndex, startRow, startX: e.clientX, startY: e.clientY, cancelled: false };
-      return;
-    }
-
-    if (e.pointerType !== "mouse") return;
-
-    const isPrimary = e.button === 0 && isMouseDragButtonHeld(e.buttons, "primary");
-    const isSecondary = (e.button === 2 || (e.buttons & 2) === 2) && isMouseDragButtonHeld(e.buttons, "secondary");
-    if (!isPrimary && !isSecondary) return;
-
-    e.preventDefault();
-    const button: MouseDragButton = isSecondary ? "secondary" : "primary";
-    const mode: ToolMode = isSecondary ? "erase" : activePlan.tool;
-    activeMouseDragRef.current = { pointerId: e.pointerId, button, mode };
-    lastPaintRef.current = { day: dayIndex, row: startRow };
-    applyActiveToolOnce(dayIndex, startRow, mode);
-  }
-
-  function onCellPointerMove(e: React.PointerEvent) {
-    const pending = pendingTouchEditRef.current;
-    if (!pending || pending.pointerId !== e.pointerId) return;
-    if (Math.hypot(e.clientX - pending.startX, e.clientY - pending.startY) > TOUCH_TAP_MOVE_THRESHOLD_PX) pending.cancelled = true;
-  }
-
-  function onCellPointerUp(e: React.PointerEvent) {
-    const activeDrag = activeMouseDragRef.current;
-    if (activeDrag?.pointerId === e.pointerId) clearMouseDrag();
-
-    const pending = pendingTouchEditRef.current;
-    if (!pending || pending.pointerId !== e.pointerId) return;
-    pendingTouchEditRef.current = null;
-    if (!pending.cancelled) applyActiveToolOnce(pending.dayIndex, pending.startRow);
-  }
-
-  function onCellPointerCancel(e: React.PointerEvent) {
-    const activeDrag = activeMouseDragRef.current;
-    if (activeDrag?.pointerId === e.pointerId) clearMouseDrag();
-
-    const pending = pendingTouchEditRef.current;
-    if (pending?.pointerId === e.pointerId) pendingTouchEditRef.current = null;
-  }
-
-  function getStripeBackground(dayIndex: number, startRow: number) {
-    const summary = summariseGroupedBlock(activePlan.grid, dayIndex, startRow, viewStep);
-
-    if (summary.kind === "free") return summary;
-
-    if (summary.kind === "single") {
-      const a = activityById.get(summary.activityId) ?? null;
-      return { kind: "single" as const, activity: a };
-    }
-
-    const segments = summary.segments.map((segment) => {
-      if (segment.activityId === null) {
-        return { key: "__free__", colour: "rgba(255,255,255,0.06)", n: segment.cellCount, label: "Free" };
-      }
-
-      const a = activityById.get(segment.activityId);
-      return {
-        key: segment.activityId,
-        colour: a?.colour ?? "#A3A3A3",
-        n: segment.cellCount,
-        label: a?.name ?? "Unknown",
-      };
-    });
-
-    const total = viewStep;
-    let acc = 0;
-    const stops: string[] = [];
-    for (const s of segments) {
-      const from = (acc / total) * 100;
-      acc += s.n;
-      const to = (acc / total) * 100;
-      stops.push(`${s.colour} ${from.toFixed(2)}% ${to.toFixed(2)}%`);
-    }
-
-    const gradient = `linear-gradient(to right, ${stops.join(", ")})`;
-    const tip = segments
-      .filter((s) => s.n > 0)
-      .map((s) => `${s.label}: ${formatMinutes(s.n * 5)}`)
-      .join("\n");
-
-    return { kind: "mixed" as const, gradient, tip };
-  }
+  const selectedActivity = activePlan.activities.find(activity => activity.id === activePlan.selectedActivityId) ?? null;
 
   function addActivity() {
     const id = `a_${uid()}`;
@@ -617,12 +419,14 @@ export default function App() {
   }
 
   function openExport() {
+    setBackupMode("export");
     setJsonBuffer(JSON.stringify(createPlannerPayload(plans, activePlan.id), null, 2));
     setJsonStatus(null);
     setImportExportOpen(true);
   }
 
   function openRecoveryImport() {
+    setBackupMode("import");
     setJsonBuffer("");
     setJsonStatus(null);
     setRecoveryStatus(null);
@@ -631,12 +435,12 @@ export default function App() {
 
   function applyImport() {
     if (startupRecovery) {
-      const replacement = applyRecoveryReplacement(localStorage, jsonBuffer);
+      const replacement = applyRecoveryReplacement(browserStorage, jsonBuffer);
       if (!replacement.ok) {
         setJsonStatus({ type: "error", message: replacement.error.message });
         return;
       }
-      setPlannerState({ plans: replacement.value.plans, activePlanId: replacement.value.activePlanId });
+      history.reset({ plans: replacement.value.plans, activePlanId: replacement.value.activePlanId });
       setStartupRecovery(null);
       setAutoPersistenceEnabled(true);
       setResetConfirmation(false);
@@ -647,13 +451,13 @@ export default function App() {
     }
 
     const currentPayload = createPlannerPayload(plans, activePlanId);
-    const imported = applyValidatedImport(localStorage, currentPayload, jsonBuffer);
+    const imported = applyValidatedImport(browserStorage, currentPayload, jsonBuffer);
     if (!imported.ok) {
       setJsonStatus({ type: "error", message: imported.error.message });
       return;
     }
 
-    setPlannerState({ plans: imported.value.plans, activePlanId: imported.value.activePlanId });
+    history.reset({ plans: imported.value.plans, activePlanId: imported.value.activePlanId });
     setStartupRecovery(null);
     setAutoPersistenceEnabled(true);
     setResetConfirmation(false);
@@ -664,13 +468,13 @@ export default function App() {
 
   function restorePreviousPlans() {
     setRecoveryStatus(null);
-    const restored = restoreBackup(localStorage);
+    const restored = restoreBackup(browserStorage);
     if (!restored.ok) {
       if (startupRecovery) setRecoveryStatus({ type: "error", message: restored.error.message });
       else setJsonStatus({ type: "error", message: restored.error.message });
       return;
     }
-    setPlannerState({ plans: restored.value.plans, activePlanId: restored.value.activePlanId });
+    history.reset({ plans: restored.value.plans, activePlanId: restored.value.activePlanId });
     setStartupRecovery(null);
     setAutoPersistenceEnabled(true);
     setCanRestorePreviousPlans(false);
@@ -694,12 +498,12 @@ export default function App() {
   function resetFromRecovery() {
     const defaultPlan = makeDefaultPlan("Default");
     const payload = createPlannerPayload([defaultPlan], defaultPlan.id);
-    const reset = resetAfterRecovery(localStorage, payload);
+    const reset = resetAfterRecovery(browserStorage, payload);
     if (!reset.ok) {
       setRecoveryStatus({ type: "error", message: "Week Planner could not reset because browser storage could not be written." });
       return;
     }
-    setPlannerState({ plans: payload.plans, activePlanId: payload.activePlanId });
+    history.reset({ plans: payload.plans, activePlanId: payload.activePlanId });
     setStartupRecovery(null);
     setAutoPersistenceEnabled(true);
     setResetConfirmation(false);
@@ -850,18 +654,7 @@ export default function App() {
 
       const draggedId = reorderDrag.id;
       const fromIndex = activePlan.activities.findIndex((a) => a.id === draggedId);
-      let toIndex = reorderDrag.insertIndex;
-
-      if (fromIndex >= 0) {
-        const without = activePlan.activities.filter((a) => a.id !== draggedId);
-        const clamped = Math.max(0, Math.min(without.length, toIndex));
-        const beforeId = without[clamped]?.id ?? null;
-        if (!beforeId) {
-          toIndex = activePlan.activities.length - 1;
-        } else {
-          toIndex = activePlan.activities.findIndex((a) => a.id === beforeId);
-        }
-      }
+      const { insertIndex: toIndex } = computeInsertIndex(ev.clientY, draggedId);
 
       setReorderDrag(null);
 
@@ -870,13 +663,16 @@ export default function App() {
       }
     };
 
+    const cancel = () => setReorderDrag(null);
+    window.addEventListener("blur", cancel);
     window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("pointercancel", cancel);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("blur", cancel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reorderDrag, activePlan.activities]);
@@ -968,33 +764,9 @@ export default function App() {
           </div>
         </div>
 
-        {importExportOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-3xl rounded-3xl bg-zinc-950 p-4 ring-1 ring-zinc-800">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-lg font-semibold">Import replacement JSON</div>
-                  <div className="text-xs text-zinc-400">Paste a valid version 3 Week Planner export to replace the unusable stored data.</div>
-                </div>
-                <button onClick={() => setImportExportOpen(false)} className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800">
-                  Close
-                </button>
-              </div>
-              <textarea
-                value={jsonBuffer}
-                onChange={(e) => setJsonBuffer(e.target.value)}
-                className="h-[360px] w-full rounded-2xl bg-zinc-900 p-3 font-mono text-xs text-zinc-100 outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
-                spellCheck={false}
-              />
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <div className="text-xs text-rose-200">{jsonStatus?.message}</div>
-                <button onClick={applyImport} className="rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 hover:opacity-90">
-                  Import replacement
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {importExportOpen && <BackupDialog recovery={!!startupRecovery} initialMode={backupMode} json={jsonBuffer} status={jsonStatus}
+          setJson={setJsonBuffer} setStatus={setJsonStatus} onClose={() => setImportExportOpen(false)} onImport={applyImport}
+          onRestore={restorePreviousPlans} canRestore={canRestorePreviousPlans} />}
       </div>
     );
   }
@@ -1052,19 +824,14 @@ export default function App() {
                     ) : null}
 
                     <div className="flex items-center justify-between gap-2">
+                      <button type="button" aria-label={`Drag ${a.name} to reorder`} title="Drag to reorder" onPointerDown={e => startReorder(e, a.id)}
+                        className="drag-handle touch-none rounded-lg p-2 text-zinc-400"><GripVertical className="h-4 w-4" /></button>
                       <button
-                        onClick={() => updateActivePlan({ selectedActivityId: a.id })}
+                        onClick={() => { updateActivePlan({ selectedActivityId: a.id }, true); if (activitiesDrawerOpen) closeActivitiesDrawer(); }}
+                        aria-pressed={selected}
                         className="flex flex-1 items-center gap-3 text-left"
                         title="Select activity"
                       >
-                        <div
-                          onPointerDown={(e) => startReorder(e, a.id)}
-                          className="flex items-center gap-2 rounded-xl px-1 py-1 text-zinc-500 hover:bg-zinc-950"
-                          title="Drag to reorder"
-                        >
-                          <GripVertical className="h-4 w-4" />
-                        </div>
-
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl" style={{ background: hexWithAlpha(a.colour, 0.22) }}>
                           <Icon className="h-5 w-5" style={{ color: a.colour }} />
                         </div>
@@ -1088,7 +855,7 @@ export default function App() {
                             setPendingClearActivityId(null);
                           }}
                           className="rounded-xl p-2 text-zinc-400 transition hover:bg-zinc-950 hover:text-zinc-100"
-                          title={expanded ? "Collapse" : "Edit"}
+                          aria-label={`${expanded ? "Collapse" : "Edit"} ${a.name}`} aria-expanded={expanded}
                         >
                           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </button>
@@ -1097,10 +864,15 @@ export default function App() {
 
                     {expanded ? (
                       <div className="mt-3 grid grid-cols-1 gap-3">
+                        <div className="flex gap-2">
+                          <button className="action-button flex-1" disabled={activePlan.activities[0].id === a.id} onClick={() => { const index = activePlan.activities.findIndex(x => x.id === a.id); updateActivePlan(p => ({ activities: reorderByIndex(p.activities, index, index - 1) })); }}>Move up</button>
+                          <button className="action-button flex-1" disabled={activePlan.activities.at(-1)?.id === a.id} onClick={() => { const index = activePlan.activities.findIndex(x => x.id === a.id); updateActivePlan(p => ({ activities: reorderByIndex(p.activities, index, index + 1) })); }}>Move down</button>
+                        </div>
                         <label className="grid gap-1">
                           <span className="text-xs text-zinc-400">Name</span>
                           <input
                             value={a.name}
+                            onFocus={beginGesture} onBlur={endGesture}
                             onChange={(e) => updateActivity(a.id, { name: e.target.value })}
                             className="rounded-2xl bg-zinc-950 px-3 py-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
                           />
@@ -1109,13 +881,14 @@ export default function App() {
                         <div className="grid gap-1">
                           <span className="text-xs text-zinc-400">Colour</span>
                           <div className="rounded-2xl bg-zinc-950 p-3 ring-1 ring-zinc-800">
-                            <div className="mb-2 grid grid-cols-10 gap-2">
+                            <div className="mb-2 grid grid-cols-5 gap-2">
                               {PRESET_COLOURS.map((c) => (
                                 <button
                                   key={c}
                                   type="button"
                                   onClick={() => updateActivity(a.id, { colour: c })}
-                                  className={`h-6 w-6 rounded-lg ring-1 transition ${
+                                  aria-label={`Colour ${c}`} aria-pressed={a.colour?.toUpperCase() === c.toUpperCase()}
+                                  className={`h-10 w-full rounded-lg ring-1 transition ${
                                     a.colour?.toUpperCase() === c.toUpperCase() ? "ring-zinc-100" : "ring-zinc-800 hover:ring-zinc-600"
                                   }`}
                                   style={{ background: c }}
@@ -1280,36 +1053,10 @@ export default function App() {
     );
   }
 
-  function renderDayNavigation() {
-    if (!canNavigateDayWindow) return null;
-
-    return (
-      <div className="mb-2 ml-1 mr-1 flex items-center justify-between gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
-        <button
-          type="button"
-          onClick={() => setDayWindowStart((start) => moveDayWindow(start, visibleDayCount, -1))}
-          disabled={!canNavigatePrevious}
-          className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
-        >
-          Previous
-        </button>
-        <div className="font-medium" aria-live="polite">{visibleDayRangeLabel}</div>
-        <button
-          type="button"
-          onClick={() => setDayWindowStart((start) => moveDayWindow(start, visibleDayCount, 1))}
-          disabled={!canNavigateNext}
-          className="rounded-xl bg-zinc-950 px-3 py-2 ring-1 ring-zinc-800 disabled:text-zinc-600"
-        >
-          Next
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
-      <div className="mx-auto flex h-full max-w-[1400px] gap-3 p-2 sm:p-4 xl:gap-4">
-        <aside className="hidden w-[360px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800 xl:flex">
+    <div className="app-shell bg-zinc-950 text-zinc-100">
+      <div className="mx-auto flex h-full min-h-0 max-w-[1600px] gap-3 p-2 sm:p-4 xl:gap-4">
+        <aside className="hidden w-[320px] shrink-0 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800 xl:flex">
           {renderActivitiesPanel()}
         </aside>
 
@@ -1350,8 +1097,8 @@ export default function App() {
         ) : null}
 
         <div ref={plannerAppRef} className="flex min-w-0 flex-1 flex-col overflow-hidden p-1">
-          <div className="mb-3 flex shrink-0 flex-col items-center text-center">
-            <div className="text-2xl font-semibold tracking-tight">Week Planner</div>
+          <div className="mb-2 hidden shrink-0 flex-col items-center text-center sm:flex">
+            <div className="text-xl font-semibold tracking-tight sm:text-2xl">Week Planner</div>
             <div className="text-sm text-zinc-400">Repeating weekly time plan, saved in your browser.</div>
           </div>
           {storageWarning ? (
@@ -1360,400 +1107,42 @@ export default function App() {
             </div>
           ) : null}
 
-          <div className="mb-3 flex shrink-0 flex-col gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800 xl:hidden">
-            <div className="flex items-center justify-between gap-2">
-              <button
-                ref={activitiesDrawerOpenButtonRef}
-                type="button"
-                onClick={openActivitiesDrawer}
-                aria-expanded={activitiesDrawerOpen}
-                aria-controls="activities-drawer"
-                className="flex items-center gap-2 rounded-xl bg-zinc-100 px-3 py-2 text-zinc-950 ring-1 ring-zinc-200"
-              >
-                <Menu className="h-4 w-4" />
-                Activities
-              </button>
-              <div className="min-w-0 text-right text-xs text-zinc-300">
-                <div className="truncate">{selectedActivity ? selectedActivity.name : "No activity selected"}</div>
-                <div className="text-zinc-500">{activePlan.tool === "paint" ? "Paint" : "Erase"}</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => updateActivePlan({ tool: "paint" })}
-                className={`rounded-xl px-3 py-2 ring-1 ${activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800"}`}
-              >
-                Paint
-              </button>
-              <button
-                onClick={() => updateActivePlan({ tool: "erase" })}
-                className={`rounded-xl px-3 py-2 ring-1 ${activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800"}`}
-              >
-                Erase
-              </button>
-            </div>
+          <div className="mb-2 flex shrink-0 items-center gap-2">
+            <button ref={activitiesDrawerOpenButtonRef} type="button" onClick={openActivitiesDrawer} aria-expanded={activitiesDrawerOpen} aria-controls="activities-drawer"
+              className="action-button min-w-0 flex-1 text-left xl:hidden"><span className="block text-xs">Activities</span><span className="block truncate text-sm">{selectedActivity?.name ?? 'Choose activity'}</span></button>
+            <span className="hidden min-w-0 flex-1 truncate text-sm text-zinc-300 xl:block">{selectedActivity?.name ?? 'Choose an activity'}</span>
+            <button className="action-button" aria-pressed={activePlan.tool === 'paint'} onClick={() => updateActivePlan({ tool: 'paint' }, true)}>Paint</button>
+            <button className="action-button" aria-pressed={activePlan.tool === 'erase'} onClick={() => updateActivePlan({ tool: 'erase' }, true)}>Erase</button>
           </div>
 
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-zinc-900/60 p-2 ring-1 ring-zinc-800">
-            <div className="mb-3 ml-1 mr-1 mt-1 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-zinc-300">Plan</span>
-                <select
-                  value={activePlan.id}
-                  onChange={(e) => setActivePlanId(e.target.value)}
-                  className="h-8 min-w-0 rounded-xl bg-zinc-950 px-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
-                >
-                  {plans.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => openPlanModal("new")}
-                  className="h-8 w-20 rounded-xl bg-zinc-950 text-xs ring-1 ring-zinc-800 transition hover:bg-zinc-800"
-                  title="New plan"
-                >
-                  New
-                </button>
-                <button
-                  onClick={() => openPlanModal("rename")}
-                  className="h-8 w-20 rounded-xl bg-zinc-950 text-xs ring-1 ring-zinc-800 transition hover:bg-zinc-800"
-                  title="Rename plan"
-                >
-                  Rename
-                </button>
-                <button
-                  onClick={() => openPlanModal("duplicate")}
-                  className="flex h-8 w-20 items-center justify-center gap-1 rounded-xl bg-zinc-950 text-xs ring-1 ring-zinc-800 transition hover:bg-zinc-800"
-                  title="Duplicate plan"
-                >
-                  <Copy className="h-3 w-3" />
-                  Duplicate
-                </button>
-                <button
-                  onClick={() => openPlanModal("delete")}
-                  disabled={plans.length <= 1}
-                  className={`flex h-8 w-20 items-center justify-center gap-1 rounded-xl text-xs ring-1 transition ${
-                    plans.length <= 1 ? "bg-zinc-950 text-zinc-500 ring-zinc-800" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
-                  }`}
-                  title={plans.length <= 1 ? "You must keep at least one plan" : "Delete plan"}
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Delete
-                </button>
-                <button
-                  onClick={openExport}
-                  className="flex h-8 w-20 items-center justify-center gap-1 rounded-xl bg-zinc-950 text-xs ring-1 ring-zinc-800 transition hover:bg-zinc-800"
-                  title="Export / Import"
-                >
-                  <Download className="h-3 w-3" />
-                  Export
-                </button>
-              </div>
-
-              <div className="hidden items-center gap-2 xl:flex">
-                <button
-                  onClick={() => updateActivePlan({ tool: "paint" })}
-                  className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
-                    activePlan.tool === "paint" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
-                  }`}
-                  title="Paint tool"
-                >
-                  <Paintbrush className="h-4 w-4" />
-                  Paint
-                </button>
-
-                <button
-                  onClick={() => updateActivePlan({ tool: "erase" })}
-                  className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ring-1 transition ${
-                    activePlan.tool === "erase" ? "bg-zinc-100 text-zinc-950 ring-zinc-200" : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
-                  }`}
-                  title="Eraser tool"
-                >
-                  <Eraser className="h-4 w-4" />
-                  Erase
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-zinc-300">View</span>
-                {([
-                  { k: "5", label: "5m" },
-                  { k: "15", label: "15m" },
-                  { k: "60", label: "1h" },
-                ] as const).map((opt) => (
-                  <button
-                    key={opt.k}
-                    onClick={() => setTimeScale(opt.k)}
-                    className={`w-16 rounded-xl py-1.5 text-sm ring-1 transition ${
-                      timeScale === opt.k
-                        ? "bg-zinc-100 text-zinc-950 ring-zinc-200"
-                        : "bg-zinc-950 text-zinc-100 ring-zinc-800 hover:bg-zinc-800"
-                    }`}
-                    title={`Show ${opt.label} blocks`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {renderDayNavigation()}
-            <div className="mb-1 ml-1 mr-1 min-h-0 flex-1 overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-zinc-800">
-              <div ref={gridViewportRef} className="h-full overflow-auto [--time-column-width:64px] xl:[--time-column-width:84px]">
-                <div className="sticky top-0 z-10 grid overflow-hidden rounded-t-2xl bg-zinc-950/95 backdrop-blur" style={{ gridTemplateColumns }}>
-                  <div ref={timeColumnHeaderRef} className="border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">Time</div>
-                  {visibleDayIndices.map((dayIndex) => (
-                    <div key={DAYS[dayIndex]} className="border-b border-l border-zinc-800 px-2 py-2 xl:px-3">
-                      <div className="text-sm font-medium">{DAYS[dayIndex]}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {Array.from({ length: CELLS_PER_DAY / viewStep }, (_, visIndex) => {
-                  const startRow = visIndex * viewStep;
-                  const showLabel = startRow % 12 === 0;
-                  const time = timeLabelForRow(startRow);
-                  const timeRange = timeRangeLabel(startRow, viewStep);
-                  const rowHeight = viewStep === 1 ? 16 : viewStep === 3 ? 18 : 32;
-
-                  return (
-                    <div key={visIndex} className="grid" style={{ gridTemplateColumns }}>
-                      <div
-                        className={`flex items-center border-b border-zinc-900 px-3 text-[11px] ${
-                          showLabel ? "text-zinc-300" : "text-zinc-600"
-                        } ${startRow % 12 === 0 ? "border-t-zinc-700 border-t" : ""}`}
-                        style={{ height: rowHeight }}
-                      >
-                        {showLabel ? time : ""}
-                      </div>
-
-                      {visibleDayIndices.map((dayIndex) => {
-                        const cellInfo = getStripeBackground(dayIndex, startRow);
-                        const isQuarterHour = startRow % 3 === 0;
-                        const isHour = startRow % 12 === 0;
-
-                        if (cellInfo.kind === "single") {
-                          const a = cellInfo.activity;
-                          const Icon = a ? getIconComponent(a.icon) : null;
-                          return (
-                            <div
-                              key={dayIndex}
-                              onContextMenu={(e) => e.preventDefault()}
-                              onPointerDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
-                              onPointerEnter={(e) => onCellPointerEnter(e, dayIndex, startRow)}
-                              onPointerMove={onCellPointerMove}
-                              onPointerUp={onCellPointerUp}
-                              onPointerCancel={onCellPointerCancel}
-                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 px-1 touch-pan-y ${
-                                isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
-                              }`}
-                              style={{
-                                height: rowHeight,
-                                background: a ? hexWithAlpha(a.colour, 0.22) : "transparent",
-                              }}
-                              title={a ? `${a.name} (${DAYS[dayIndex]} ${timeRange})` : `${DAYS[dayIndex]} ${timeRange}`}
-                            >
-                              {a && isQuarterHour && Icon ? (
-                                <div className="absolute inset-y-0 left-1 flex items-center">
-                                  <Icon className="h-3 w-3" style={{ color: a.colour }} />
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        }
-
-                        if (cellInfo.kind === "mixed") {
-                          return (
-                            <div
-                              key={dayIndex}
-                              onContextMenu={(e) => e.preventDefault()}
-                              onPointerDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
-                              onPointerEnter={(e) => onCellPointerEnter(e, dayIndex, startRow)}
-                              onPointerMove={onCellPointerMove}
-                              onPointerUp={onCellPointerUp}
-                              onPointerCancel={onCellPointerCancel}
-                              className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 touch-pan-y ${
-                                isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
-                              }`}
-                              style={{ height: rowHeight, backgroundImage: cellInfo.gradient }}
-                              title={`${DAYS[dayIndex]} ${timeRange}\n${cellInfo.tip}`}
-                            />
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={dayIndex}
-                            onContextMenu={(e) => e.preventDefault()}
-                            onPointerDown={(e) => onCellPointerDown(e, dayIndex, startRow)}
-                            onPointerEnter={(e) => onCellPointerEnter(e, dayIndex, startRow)}
-                            onPointerMove={onCellPointerMove}
-                            onPointerUp={onCellPointerUp}
-                            onPointerCancel={onCellPointerCancel}
-                            className={`relative cursor-crosshair select-none border-b border-l border-zinc-900 touch-pan-y ${
-                              isHour ? "border-t-zinc-700 border-t" : isQuarterHour ? "border-t-zinc-800 border-t" : ""
-                            }`}
-                            style={{ height: rowHeight, background: "transparent" }}
-                            title={`${DAYS[dayIndex]} ${timeRange}`}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {importExportOpen ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={(e) => {
-                if (e.target === e.currentTarget) setImportExportOpen(false);
-              }}>
-                <div className="w-full max-w-3xl rounded-3xl bg-zinc-950 p-4 ring-1 ring-zinc-800">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-lg font-semibold">Export / Import</div>
-                      <div className="text-xs text-zinc-400">Copy the JSON somewhere safe, or paste JSON here to import.</div>
-                    </div>
-                    <button onClick={() => setImportExportOpen(false)} className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800">
-                      Close
-                    </button>
-                  </div>
-
-                  <textarea
-                    value={jsonBuffer}
-                    onChange={(e) => setJsonBuffer(e.target.value)}
-                    className="h-[360px] w-full rounded-2xl bg-zinc-900 p-3 font-mono text-xs text-zinc-100 outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
-                    spellCheck={false}
-                  />
-
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-xs">
-                      {jsonStatus ? (
-                        <span
-                          className={`rounded-xl px-2 py-1 ring-1 ${
-                            jsonStatus.type === "ok" ? "bg-zinc-900 text-zinc-100 ring-zinc-700" : "bg-zinc-900 text-rose-200 ring-rose-900/60"
-                          }`}
-                        >
-                          {jsonStatus.message}
-                        </span>
-                      ) : (
-                        <span className="text-zinc-500">Tip: Keep this JSON in a password manager note.</span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      {canRestorePreviousPlans ? (
-                        <button
-                          onClick={restorePreviousPlans}
-                          className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800"
-                          title="Restore previous plans"
-                        >
-                          Restore previous plans
-                        </button>
-                      ) : null}
-                      <button
-                        onClick={() => {
-                          navigator.clipboard?.writeText(jsonBuffer);
-                          setJsonStatus({ type: "ok", message: "Copied to clipboard." });
-                        }}
-                        className="flex items-center gap-2 rounded-2xl bg-zinc-900 px-3 py-2 text-sm hover:bg-zinc-800"
-                        title="Copy"
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy
-                      </button>
-                      <button
-                        onClick={applyImport}
-                        className="flex items-center gap-2 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-950 hover:opacity-90"
-                        title="Import"
-                      >
-                        <Upload className="h-4 w-4" />
-                        Import
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
+            <PlannerToolbar plans={plans} plan={activePlan} onSelect={setActivePlanId} onPlanAction={openPlanModal}
+              onExport={openExport} onImport={() => { setBackupMode('import'); setJsonBuffer(''); setJsonStatus(null); setImportExportOpen(true); }}
+              timeScale={timeScale} onScale={setTimeScale} undo={undo} redo={redo} canUndo={history.canUndo} canRedo={history.canRedo} />
+            <PlannerGrid plan={activePlan} step={viewStep} beginGesture={beginGesture} endGesture={endGesture}
+              onPaint={(day, row, length, activity) => updateActivePlan(p => ({ grid: updateGridRange(p.grid, day, row, length, activity) }))} />
+        {importExportOpen && <BackupDialog recovery={!!startupRecovery} initialMode={backupMode} json={jsonBuffer} status={jsonStatus}
+          setJson={setJsonBuffer} setStatus={setJsonStatus} onClose={() => setImportExportOpen(false)} onImport={applyImport}
+          onRestore={restorePreviousPlans} canRestore={canRestorePreviousPlans} />}
           </main>
 
-          <footer className="mt-3 shrink-0 text-center text-xs text-zinc-500">Stored locally in your browser via localStorage. No server required.</footer>
+          <footer className="mt-2 shrink-0 text-center text-xs text-zinc-400"><span role="status">{storageWarning ? 'Unsaved changes' : autoPersistenceEnabled ? 'Saved in this browser' : 'Saving unavailable'}</span> · <span>{formatMinutes(allocationSummary.freeMinutes)} free</span></footer>
+          <p role="status" className="sr-only">{actionMessage}</p>
         </div>
       </div>
 
-      {planModalOpen ? (
-        <div
-          className="fixed inset-0 z-[55] flex items-center justify-center bg-black/70 p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setPlanModalOpen(false);
-          }}
-        >
-          <div className="w-full max-w-lg rounded-3xl bg-zinc-950 p-4 ring-1 ring-zinc-800">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <div className="text-lg font-semibold">{planModalTitle}</div>
-                <div className="text-xs text-zinc-400">
-                  {planModalMode === "delete" ? "This will remove the plan and all its data." : "Plans are saved locally in your browser."}
-                </div>
-              </div>
-              <button
-                onClick={() => setPlanModalOpen(false)}
-                className="rounded-2xl bg-zinc-900 p-2 text-zinc-200 hover:bg-zinc-800"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {planModalMode === "delete" ? (
-              <div className="rounded-2xl bg-zinc-900 px-3 py-3 text-sm text-zinc-200 ring-1 ring-zinc-800">
-                Delete plan <span className="font-semibold">{activePlan.name}</span>?
-              </div>
-            ) : (
-              <label className="grid gap-1">
-                <span className="text-xs text-zinc-400">Plan name</span>
-                <input
-                  autoFocus
-                  value={planNameDraft}
-                  onChange={(e) => {
-                    setPlanNameDraft(e.target.value);
-                    setPlanModalError(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitPlanModal();
-                  }}
-                  className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm outline-none ring-1 ring-zinc-800 focus:ring-zinc-700"
-                />
-              </label>
-            )}
-
-            {planModalError ? <div className="mt-2 text-xs text-rose-200">{planModalError}</div> : null}
-
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setPlanModalOpen(false)}
-                className="rounded-2xl bg-zinc-900 px-3 py-2 text-sm ring-1 ring-zinc-800 hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={commitPlanModal}
-                disabled={planModalMode === "delete" && plans.length <= 1}
-                className={`rounded-2xl px-3 py-2 text-sm ring-1 transition ${
-                  planModalMode === "delete"
-                    ? plans.length <= 1
-                      ? "bg-zinc-900 text-zinc-500 ring-zinc-800"
-                      : "bg-zinc-900 text-zinc-100 ring-rose-900/60 hover:bg-zinc-800"
-                    : "bg-zinc-100 text-zinc-950 ring-zinc-200 hover:opacity-90"
-                }`}
-              >
-                {planModalMode === "delete" ? "Delete" : "Save"}
-              </button>
-            </div>
-          </div>
+      {planModalOpen && <Modal title={planModalTitle} onClose={() => setPlanModalOpen(false)}>
+        <p className="mb-4 text-sm text-zinc-300">{planModalMode === 'delete' ? `Delete “${activePlan.name}” and its allocations? You can undo this until you reload.` : 'Plans are saved in this browser.'}</p>
+        {planModalMode !== 'delete' && <label className="grid gap-2 text-sm">Plan name
+          <input autoFocus value={planNameDraft} maxLength={60} onChange={event => { setPlanNameDraft(event.target.value); setPlanModalError(null); }}
+            onKeyDown={event => { if (event.key === 'Enter') commitPlanModal(); }} className="rounded-xl bg-zinc-900 px-3 py-3" />
+        </label>}
+        {planModalError && <p role="alert" className="mt-2 text-sm text-rose-200">{planModalError}</p>}
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="action-button" onClick={() => setPlanModalOpen(false)}>Cancel</button>
+          <button className="action-button primary" onClick={commitPlanModal}>{planModalMode === 'delete' ? 'Delete plan' : 'Save plan'}</button>
         </div>
-      ) : null}
+      </Modal>}
 
       {reorderOverlay ? (
         <div className="pointer-events-none fixed z-[60]" style={{ top: reorderOverlay.top, left: reorderOverlay.x, width: reorderOverlay.width }}>
