@@ -7,6 +7,9 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
     const previous = document.activeElement;
     const dialog = ref.current;
     dialog?.showModal();
+    const autofocus = dialog?.querySelector<HTMLElement>('[autofocus]');
+    const firstFocusable = dialog?.querySelector<HTMLElement>('button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])');
+    (autofocus ?? firstFocusable)?.focus();
     return () => {
       dialog?.close();
       const details = previous instanceof HTMLElement ? previous.closest('details') : null;
