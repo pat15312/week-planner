@@ -8,7 +8,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
     const dialog = ref.current;
     dialog?.showModal();
     const autofocus = dialog?.querySelector<HTMLElement>('[autofocus]');
-    const firstFocusable = dialog?.querySelector<HTMLElement>('button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])');
+    const firstFocusable = dialog?.querySelector<HTMLElement>('input, select, textarea, [href], button, [tabindex]:not([tabindex="-1"])');
     (autofocus ?? firstFocusable)?.focus();
     return () => {
       dialog?.close();
