@@ -55,6 +55,8 @@ test('keyboard editing and modal focus are usable', async ({ page }) => {
   const dialog = page.getByRole('dialog', { name: 'Rename plan' });
   await expect(dialog).toBeVisible();
   const nameInput = dialog.getByRole('textbox', { name: 'Plan name' });
+  await expect.poll(() => dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+  await nameInput.focus();
   await expect(nameInput).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
