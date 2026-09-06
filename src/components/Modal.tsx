@@ -9,8 +9,10 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
     dialog?.showModal();
     const autofocus = dialog?.querySelector<HTMLElement>('[autofocus]');
     const firstFocusable = dialog?.querySelector<HTMLElement>('input, select, textarea, [href], button, [tabindex]:not([tabindex="-1"])');
-    (autofocus ?? firstFocusable)?.focus();
+    const focusTarget = autofocus ?? firstFocusable;
+    const frame = focusTarget ? requestAnimationFrame(() => focusTarget.focus()) : undefined;
     return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
       dialog?.close();
       const details = previous instanceof HTMLElement ? previous.closest('details') : null;
       if (details && !details.open) details.querySelector('summary')?.focus();
