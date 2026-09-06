@@ -1,467 +1,66 @@
 # Project status
 
-Last updated: 16 July 2026
+Last updated: 6 September 2026
 
 ## Current stage
 
-Week Planner is in a structured improvement phase.
+Version 1.0 release candidate. The existing React web application remains the product foundation. Native SwiftUI and synchronisation remain future work.
 
-The immediate objective is to establish a reliable Codex workflow, document the current product and strengthen the existing React application before considering a native SwiftUI rebuild.
+## Implemented in the release candidate
 
-No application behaviour is intentionally changed by this documentation baseline.
+- Fixed downward activity drops landing beyond the indicated gap.
+- Cancelled activity drags no longer commit a reorder.
+- Added Move up and Move down alternatives for touch and keyboard use.
+- Added bounded, session-only undo and redo for planner changes. Mouse paint gestures and activity-name editing sessions are grouped into single undo steps.
+- Added keyboard grid navigation, painting and erasing, readable cell labels and focus indication.
+- Added accessible native modal dialogs with focus containment and restoration.
+- Added JSON file download and upload alongside copy and paste, with clipboard failure reporting.
+- Preserved schema version 3, existing storage and pre-import backup keys, validation and recovery.
+- Added separately versioned view preferences, with the hourly overview as the initial default.
+- Increased touch cell heights to at least 44 CSS pixels, retained swipe scrolling and tap editing, and added a time jump control.
+- Simplified narrow-screen controls and retained the approved minimum three-day model.
+- Added visible scrollbars, dynamic viewport height and a mobile free-time summary.
+- Extracted grid, toolbar, backup dialog, shared modal and history responsibilities from App.tsx.
+- Replaced starter branding and standardised Node.js through .nvmrc.
+- Added browser regression tests and made them part of pull-request and deployment checks.
 
-## Current baseline
+## Verification
 
-The repository contains a working client-side application with:
+Local checks completed during implementation:
 
-- React, TypeScript, Vite and Tailwind CSS
-- multiple locally saved weekly plans
-- five-minute allocation data for all seven days
-- 5-minute, 15-minute and 1-hour views
-- custom activities
-- desktop paint and erase interactions
-- activity totals and free-time calculation
-- JSON import and export
-- browser `localStorage` persistence
+- dependency installation
+- linting
+- 87 unit tests
+- production build
 
-The current architecture is still concentrated heavily in `src/App.tsx`, but shared planner types, pure planner operations, immutable grid updates and grouped-block summaries now live in `src/domain/planner.ts`.
+Browser checks are run through GitHub Actions against the production build. Results are recorded on the pull request and in the browser-results workflow artifact. The matrix covers Chromium and WebKit at 375, 768, 1024 and 1440 CSS pixels, including touch contexts.
 
-The application is deployed through GitHub Actions to:
+A cloud browser could open the existing public deployment but could not connect to the local development server. This is an environment limitation. Real iPhone and iPad hardware have not been tested in this session.
 
-https://pat15312.github.io/week-planner/
+## Release gate
 
-## Completed baseline review
+Before labelling version 1.0 final:
 
-The initial Codex review was completed on 16 July 2026.
+1. Require a successful pull-request workflow, including browser journeys.
+2. Review screenshots at phone, tablet and desktop sizes.
+3. Verify actual iPhone/iPad scrolling, touch reordering, virtual-keyboard behaviour and backup downloads.
+4. Review the prepared change before merging. Main deploys automatically after all checks pass.
+5. Replace the release-candidate version with 1.0.0 and create the v1.0.0 release tag on the verified main commit.
 
-It included:
+## Remaining limitations
 
-- reading the complete six-document project context
-- inspecting every tracked file in the repository
-- reviewing repository history for older storage formats
-- installing locked dependencies
-- running linting and the production build
-- serving the production output locally
-- checking the live GitHub Pages application
-- exercising representative plan, view, export and reload behaviour
-- confirming that no repository changes were made during the review
+- Plans are local to a browser. Clearing browser data removes them unless an external backup exists.
+- There is no cross-tab conflict handling or device synchronisation.
+- Undo history is limited to 50 changes and is cleared on reload or successful import/restore/reset. A pre-import backup remains the recovery path across those boundaries.
+- A browser engine test does not establish real-device comfort or full screen-reader conformance.
+- No software licence has been selected. Do not infer redistribution rights.
 
-Verified results:
+## Approved direction
 
-- dependency installation passes
-- the production build passes
-- the live deployment is reachable and matches the local build output
-- linting ran and failed with seven existing errors at that time
-- plans survive reload
-- the previously active plan is not restored after reload
-- repository history contains no evidence of storage versions 1 or 2
+The project lead approved implementing the review recommendations on 6 September 2026, with particular attention to mobile usability. This includes the hourly initial view, remembered scale, reversible editing, keyboard accessibility and file backups.
 
-Detailed technical findings belong in [TECHNICAL.md](TECHNICAL.md).
+The existing versioned storage key is deliberately retained. A future data-format change must include a tested migration. No migration is needed for this release because the plan format is unchanged.
 
+## Next task
 
-## Completed data-safety hardening
-
-Saved-data and JSON import hardening was completed on 16 July 2026.
-
-The change included:
-
-- adding a shared version 3 validation boundary for imports, browser-stored data and pre-import backups
-- preserving the existing `week_planner_5min_store_v3` main storage key and version 3 payload
-- adding a versioned pre-import backup at `week_planner_5min_pre_import_backup_v3`
-- rejecting invalid imports without changing current plans or replacing the backup
-- validating and writing a pre-import backup before successful imports replace current plans
-- adding a visible restore action for valid pre-import backups
-- entering recovery mode when browser-stored data is malformed, unsupported or structurally invalid
-- preserving invalid stored text exactly until the user imports a valid replacement or explicitly confirms a reset
-- disabling automatic persistence for the session when browser storage cannot be read at start-up
-- opening recovery replacement import with an empty field and without backing up the temporary default plan
-- warning when browser storage reads or writes fail
-- removing the remaining explicit `any` lint failures from `src/App.tsx`
-
-Verified results after the change:
-
-- `npm ci` passes
-- `npm run test` passes with 37 tests
-- `npm run lint` passes
-- `npm run build` passes
-
-## Completed active-plan restoration fix
-
-The active-plan restoration bug was fixed on 16 July 2026.
-
-The change included:
-
-- initialising stored plans and the active plan identifier together before automatic persistence begins
-- restoring a valid stored active plan after reload
-- deliberately falling back to the first stored plan when the stored active plan is missing or invalid
-- keeping absent or malformed storage on the normal default-plan path
-- adding Vitest coverage for the storage initialisation helper
-
-Verified results after the change:
-
-- `npm ci` passes
-- `npm run test` passes
-- `npm run build` passes
-- `npm run lint` still ran and failed with five remaining pre-existing explicit-`any` errors in `src/App.tsx` at that time
-
-## Completed test foundation
-
-The initial unit-test foundation was completed on 16 July 2026.
-
-It included:
-
-- adding Vitest and an `npm run test` script
-- extracting shared planner types and pure helper logic into `src/domain/planner.ts`
-- replacing development-only helper assertions with formal unit tests
-- preserving the existing storage key, persisted schema, visual interface and established planner behaviour
-
-Verified results after the change:
-
-- `npm ci` passes
-- `npm run test` passes
-- `npm run build` passes
-- `npm run lint` still ran and failed with six remaining pre-existing explicit-`any` errors in `src/App.tsx` at that time
-
-
-## Completed CI quality gates
-
-Pull-request and deployment quality gates were added on 16 July 2026.
-
-The change included:
-
-- adding a pull-request workflow for changes targeting `main`
-- running `npm ci`, `npm run lint`, `npm run test` and `npm run build` in the pull-request workflow
-- using Node.js 20 and the npm cache in the pull-request workflow to match deployment
-- keeping pull-request workflow permissions read-only
-- adding linting and tests before the production build, artifact upload and GitHub Pages deployment
-- preserving the existing deployment triggers, Pages permissions, concurrency, artifact path, environment and deployment actions
-
-Verified results after the change:
-
-- `npm ci` passes
-- `npm run lint` passes
-- `npm run test` passes
-- `npm run build` passes
-
-## Completed planner domain extraction
-
-Allocation summary and plan operation extraction was completed on 16 July 2026.
-
-The change included:
-
-- moving allocation summaries for activity minutes, free minutes and the 10,080-minute week total from `src/App.tsx` into `src/domain/planner.ts`
-- moving pure plan operations for add, rename, duplicate and delete into `src/domain/planner.ts`
-- preserving modal state, validation, identifier generation, persistence and display concerns in `src/App.tsx`
-- adding focused Vitest coverage for allocation summaries, deterministic plan operations, missing plan identifiers and immutability
-
-Verified results after the change:
-
-- `npm ci` passes
-- `npm run lint` passes
-- `npm run test` passes with 49 tests
-- `npm run build` passes
-- `git diff --check` passes
-
-Browser manual checks were not performed because browser execution was unavailable in this environment.
-
-
-## Completed grid domain extraction
-
-Grid range update and grouped-block summary extraction was completed on 16 July 2026.
-
-The change included:
-
-- moving immutable grid range painting and erasing from `src/App.tsx` into `src/domain/planner.ts`
-- moving grouped-block calculation into a structured domain helper that returns free, single-activity or mixed segment data without CSS or React presentation details
-- preserving activity lookup, colours, icons, gradient construction, tooltip wording, pointer handling and state updates in `src/App.tsx`
-- adding focused Vitest coverage for five-minute, 15-minute and one-hour grid updates, clamping, overwriting, erasing, grouped block ordering, free time, unknown identifiers and immutability
-- completing the currently planned pure-logic extraction sequence
-
-Verified results after the change:
-
-- `npm ci` passes
-- `npm run lint` passes
-- `npm run test` passes with 70 tests
-- `npm run build` passes
-- `git diff --check` passes
-
-Browser manual checks were not performed because browser execution was unavailable in this environment.
-
-## Completed preparation
-
-The following preparation has been completed:
-
-- reviewed the repository structure and complete current source
-- identified Week Planner as a time allocation product rather than a generic time-management application
-- agreed that the product should remain distinct from calendars and task managers
-- agreed a local-first direction
-- agreed to strengthen the web application before beginning a native iOS version
-- agreed that public repository documentation must contain no personal information
-- reduced the context system to six harmonised files
-- defined ownership boundaries between product, technical and status information
-- added the six-document baseline to the repository
-- verified the current build, deployment and representative behaviour
-
-## Current priorities
-
-### 1. Establish behavioural safety
-
-Before substantial refactoring:
-
-- select and add an automated unit-test framework
-- move the existing self-tests into formal unit tests
-- add characterisation tests for current planner behaviour
-- capture representative version 3 saved data as anonymous test fixtures
-- test export and import boundaries
-- test destructive plan and activity operations
-
-### 2. Maintain extracted pure planner logic
-
-The currently planned pure-logic extraction sequence is complete. Future pure helper extraction should be considered only when it supports a specific reviewed change and can preserve the product's appearance, storage key, persisted schema and established planner behaviour.
-
-### 3. Continue storage safety towards migration
-
-The current version 3 data contract is now validated and recoverable. Before changing storage keys or schemas:
-
-- decide the future stable storage key
-- design and test a migration from `week_planner_5min_store_v3`
-- preserve a recoverable copy before any destructive migration
-- keep the versioned backup and recovery behaviour intact
-
-Do not add version 1 or version 2 migration code unless real historical data is identified.
-
-### 4. Split the interface into coherent components
-
-After tests protect behaviour, separate:
-
-- application shell
-- activity sidebar
-- activity editor
-- plan controls
-- planner toolbar
-- weekly grid
-- import and export
-- modal components
-
-Avoid a rewrite. Use incremental extraction.
-
-### 5. Refine mobile and touch behaviour
-
-The first narrow-screen slice is implemented. Continue treating mobile usability as a product-design task, not only a responsive CSS task.
-
-Further evidence is needed for:
-
-- real-device comfort across supported narrow sizes
-- touch target size and density
-- activity drawer behaviour on real devices
-- touch activity reordering
-- undo and recovery
-- tablet layouts
-- keyboard and accessibility support
-
-### 6. Consider product enhancements
-
-Only after the foundation is stable should new features be prioritised.
-
-New features must support intentional weekly allocation and should not turn the product into a generic productivity suite.
-
-## Known issues and risks
-
-### High priority
-
-#### The storage key embeds the schema version
-
-The current key, `week_planner_5min_store_v3`, is tied to one schema version. It must not be changed until a tested migration and recovery path exists.
-
-#### `App.tsx` has too many responsibilities
-
-The application is difficult to change safely because persistence, interactions and presentation are still combined. Shared planner types, allocation summaries, pure plan operations, grid updates and grouped-block calculations have been extracted, but `App.tsx` still owns substantial rendering, event handling and browser-effect responsibilities.
-
-### Medium priority
-
-#### Mobile interaction needs real-device verification
-
-The first responsive 3-to-7-day grid, activities drawer and tap editing slice is implemented, but real-device and browser verification is still needed before mobile usability can be considered mature.
-
-#### Accessibility is incomplete
-
-Keyboard, screen-reader, focus and non-colour communication require deliberate design.
-
-#### Hidden scrollbars reduce discoverability
-
-Scrolling remains possible, but users may not realise that more content exists.
-
-#### Runtime version is only partially defined
-
-Deployment uses Node.js 20, but local development does not have a pinned version.
-
-### Low priority
-
-#### Starter metadata remains
-
-The default Vite icon, starter package name and unused starter files remain.
-
-#### Commit descriptions provide limited history
-
-More descriptive commit messages will make future changes easier to understand and reverse.
-
-#### No licence is declared
-
-The repository does not currently state reuse or redistribution terms.
-
-## Roadmap
-
-### Phase 1: Establish the baseline
-
-- add project documentation
-- verify install, lint, build and deployment
-- introduce automated tests
-- capture current behaviour
-- agree supported environments
-
-### Phase 2: Strengthen the web architecture
-
-- extract domain logic
-- fix active-plan restoration
-- add full schema validation and migration
-- migrate the legacy versioned storage key to a stable key
-- isolate persistence
-- componentise the interface
-- add CI checks
-- improve commit and release discipline
-
-### Phase 3: Improve the web experience
-
-- design responsive layouts
-- add touch interaction
-- improve accessibility
-- improve recovery and undo
-- refine visual feedback
-- assess performance
-
-### Phase 4: Evolve the product
-
-- prioritise selected product enhancements
-- validate the time allocation philosophy through use
-- stabilise a portable data contract
-- decide whether cloud synchronisation is justified
-
-### Phase 5: Prepare the native application
-
-- define the native scope
-- select the Swift data and persistence approach
-- map established web behaviour to native interaction patterns
-- create a SwiftUI prototype
-- establish TestFlight review workflows
-
-## Recorded decisions
-
-### 16 July 2026: Product category
-
-Week Planner is defined as a time allocation application.
-
-This wording should guide product and interface decisions.
-
-### 16 July 2026: Product boundary
-
-The application should remain distinct from calendars, task managers and generic productivity suites.
-
-### 16 July 2026: Local-first direction
-
-Core use should not require an account or cloud service.
-
-### 16 July 2026: Web before native
-
-The existing web application will be strengthened and used as a behavioural specification before a native SwiftUI version is developed.
-
-### 16 July 2026: Public documentation privacy
-
-Repository documentation must not contain personal information, private chat context or commercially sensitive details.
-
-### 16 July 2026: Documentation structure
-
-Project context is deliberately limited to:
-
-- `README.md`
-- `AGENTS.md`
-- `HUMAN.md`
-- `docs/PRODUCT.md`
-- `docs/TECHNICAL.md`
-- `docs/STATUS.md`
-
-Detailed information should have one owning document to minimise duplication and conflict.
-
-### 16 July 2026: Active-plan restoration
-
-The application should restore the previously active valid plan after reload. Current failure to do so is a confirmed bug.
-
-### 16 July 2026: Historical storage versions
-
-Repository history contains no evidence of storage versions 1 or 2. Migration support for those versions should be added only if real historical data is identified.
-
-### 16 July 2026: Import recovery
-
-Successful imports preserve a recoverable version 3 copy of the current data before replacing plans. Invalid imports leave current plans unchanged.
-
-## Open decisions
-
-The following decisions are not yet settled:
-
-- supported desktop browsers
-- minimum supported phone and tablet sizes
-- exact touch-editing model
-- whether the web application is a permanent product or primarily a route to native
-- whether cloud synchronisation will ever be needed
-- whether planned-versus-actual comparison belongs within the product boundary
-- the appropriate open-source or private licence
-- the long-term release and quality-gate process
-- the supported local Node.js version
-
-Do not treat an open decision as an approved requirement.
-
-## Documentation maintenance
-
-After each meaningful task:
-
-- record completed work briefly
-- update known issues when evidence changes
-- keep the next priorities current
-- add a dated decision when a material choice is approved
-- remove obsolete status rather than allowing the document to grow indefinitely
-
-Product details belong in `PRODUCT.md`.
-
-Architecture and data details belong in `TECHNICAL.md`.
-
-This file should remain focused on the current state and direction.
-
-## Completed responsive variable-day planner slice
-
-The first responsive mobile and narrow-screen planner slice was completed on 17 July 2026 and corrected to use a measured 3-to-7-day window.
-
-The change included:
-
-- keeping the Tailwind `xl`, 1280 CSS pixel, breakpoint for switching between the overlay activities drawer and desktop sidebar
-- measuring the planner grid width and showing a consecutive 3-to-7-day window based on the space available for day columns
-- keeping the desktop layout on seven days with the established permanent activities sidebar
-- moving the activities interface into an overlay drawer on narrow screens while reusing the same activities panel implementation
-- keeping the selected activity and Paint or Erase tool visible in a compact narrow toolbar while the drawer is closed
-- rendering partial-week day navigation whenever fewer than seven days are visible, independent of the activities drawer breakpoint
-- restoring the 64px time column below `xl` and the established 84px time column at and above `xl`
-- adding pointer-event planner-cell handling so mouse drags edit only while the required button remains held, right-button drags erase, touch-style taps paint or erase once, and vertical movement cancels the pending edit for normal scrolling
-- preserving the existing storage keys, version 3 persisted payload schema, five-minute storage grid and grouped-block painting behaviour
-- adding focused Vitest coverage for visible day-count calculation, 3-to-7-day windows, previous and next movement, clamping, underlying day indices and mouse button-state predicates
-
-Verified results after the change:
-
-- `npm run lint` passes
-- `npm run test` passes with 82 tests
-- `npm run build` passes
-
-Manual browser checks are still recommended at 375, 768, 1024 and 1440 CSS pixels before treating the responsive experience as complete. Remaining mobile risks include real-device touch feel, small-screen density, discoverability of vertical scrolling, pointer behaviour on hybrid devices and activity reordering ergonomics inside the drawer.
-
-## Recommended next Codex task
-
-The next small implementation task should be:
-
-> Manually verify and refine the responsive planner slice on real or emulated narrow viewports, with emphasis on scrolling comfort, touch target sizes and activity reordering on touch devices.
+Complete release-candidate verification, address concrete findings and obtain the project lead's review of the finished interface before the final release.

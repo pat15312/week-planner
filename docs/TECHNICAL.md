@@ -1,504 +1,115 @@
 # Technical context
 
-Last reviewed: 16 July 2026
+Last reviewed: 6 September 2026
 
-This document describes the current implementation and the agreed engineering direction. It should contain verified technical information, not speculative product requirements.
+## Stack and runtime
 
-## Current stack
+React 19, TypeScript 5.9, Vite 7, Tailwind CSS 4 and Lucide icons. The application is a client-side web app with no backend, account requirement or telemetry.
 
-The repository currently declares:
+Node.js 24.19.0 is pinned in `.nvmrc` and used by both GitHub workflows. Install locked dependencies with `npm ci`.
 
-- React `^19.2.3`
-- React DOM `^19.2.3`
-- TypeScript `~5.9.3`
-- Vite `^7.3.1`
-- Vitest `^4.1.10`
-- Tailwind CSS `^4.1.18`
-- Lucide React `^0.562.0`
-- ESLint `^9.39.2`
+Commands:
 
-The application is a client-side React application with no current backend.
+- `npm run dev`: development server
+- `npm run lint`: ESLint
+- `npm run test`: Vitest unit tests under src
+- `npm run build`: TypeScript check and production bundle
+- `npm run check`: lint, unit tests and production build
+- `npm run test:e2e`: Playwright journeys against the built app
+- `npm run preview`: preview the production bundle
 
-## Repository entry points
+The test dependency Playwright is justified by browser event, focus, file and responsive-layout behaviour that pure function tests cannot exercise.
 
-- `index.html` provides the root element and page metadata.
-- `src/main.tsx` creates the React root in `StrictMode`.
-- `src/App.tsx` contains the React state, interactions and most of the rendered interface.
-- `src/domain/planner.ts` contains shared planner types and extracted pure helper logic.
-- `src/domain/persistence.ts` contains version 3 payload validation, storage keys and pure persistence safety operations.
-- `src/domain/planner.test.ts` contains Vitest unit tests for the extracted planner helpers.
-- `src/domain/persistence.test.ts` contains Vitest unit tests for validation, import, backup, recovery and storage failure behaviour.
-- `src/index.css` imports Tailwind and globally hides scrollbars.
-- `vite.config.ts` configures React and the `/week-planner/` base path.
+## Responsibility boundaries
 
-At the time of the unit-test extraction, `src/App.tsx` is 1,316 lines and still has too many responsibilities. This is a maintainability concern, but it is not by itself justification for a broad rewrite.
+- `src/App.tsx`: application composition, plan/activity controls, browser persistence and recovery state.
+- `src/domain/planner.ts`: plan types and pure calculations, plan operations, grid operations and grouped summaries.
+- `src/domain/persistence.ts`: untrusted version 3 validation, startup recovery, verified writes, pre-import backup and restoration.
+- `src/domain/history.ts`: immutable undo/redo reducer.
+- `src/domain/preferences.ts`: independently versioned, optional view preferences.
+- `src/hooks/usePlannerHistory.ts`: React history integration and edit grouping.
+- `src/components/PlannerGrid.tsx`: measured day windows, grid presentation and mouse/touch/keyboard interactions.
+- `src/components/PlannerToolbar.tsx`: plan operations, scale and history controls.
+- `src/components/Modal.tsx`: native HTML dialog with focus management.
+- `src/components/BackupDialog.tsx`: backup files, JSON text and copy feedback.
 
-The repository also retains unused starter files and metadata, including `src/App.css`, `src/assets/react.svg` and the package name `vite-react-typescript-starter`.
+The activity editor remains in App.tsx. Further extraction should support a concrete change, not a speculative rewrite.
 
-## Available scripts and verified baseline
+## Portable plan data
 
-The repository declares:
-
-```json
-{
-  "dev": "vite",
-  "build": "tsc -b --noEmit && vite build",
-  "lint": "eslint .",
-  "preview": "vite preview",
-  "test": "vitest run"
-}
-```
-
-The automated unit-test command is `npm run test`, which runs Vitest once.
-
-The baseline review on 16 July 2026 verified:
-
-- dependency installation succeeds with `npm ci`
-- `npm run build` succeeds
-- the production output serves successfully at `/week-planner/`
-- `npm run lint` passes after the data-safety change removed the remaining explicit `any` usage
-
-The review used Node.js `24.14.0` and npm `11.9.0`. The initial install attempt failed because the review environment did not permit npm to create `/root/.npm`; the same clean install succeeded when an explicit writable npm cache was supplied. This was an environment restriction, not a repository dependency failure.
-
-
-## Current data model
-
-### Activity
-
-An activity currently contains:
+The plan schema is unchanged:
 
 ```ts
-type Activity = {
-  id: string;
-  name: string;
-  colour: string;
-  icon: string;
-};
-```
-
-### Plan
-
-A plan currently contains:
-
-```ts
+type Activity = { id: string; name: string; colour: string; icon: string };
 type Plan = {
   id: string;
   name: string;
   activities: Activity[];
   grid: (string | null)[][];
   selectedActivityId: string | null;
-  tool: "paint" | "erase";
+  tool: 'paint' | 'erase';
 };
+type Payload = { version: 3; activePlanId: string | null; plans: Plan[] };
 ```
 
-### Weekly grid
+The grid is `grid[day][row]`, Monday to Sunday, with 288 five-minute cells per day. It represents 2,016 cells, 10,080 minutes, or 168 hours.
 
-The grid is stored as:
+Five-minute, 15-minute and hourly views group 1, 3 and 12 underlying cells. Painting a displayed block overwrites its entire underlying range. Mixed blocks retain proportional colour summaries and expose activity durations through their accessible labels and titles. They do not imply chronological ordering within the displayed block.
 
-```text
-grid[day][row]
-```
+## Storage and recovery
 
-It contains:
+Main key: `week_planner_5min_store_v3`.
 
-- 7 day arrays
-- 288 rows per day
-- one row for every five minutes
-- an activity identifier or `null` in each cell
+Pre-import backup: `week_planner_5min_pre_import_backup_v3`.
 
-The full week therefore contains 2,016 cells and represents 10,080 minutes, or 168 hours.
+No existing key is renamed or abandoned. Schema version 3 is maintained, so existing valid browser data and exports remain readable. Future schema evolution requires explicit validation, migration, historical fixtures and recovery. Historical versions 1 and 2 are not supported without evidence of real data.
 
-This model is simple and explicit. It is suitable for accurate allocation and portable serialisation, although storage and rendering concerns should be separated from the domain model during refactoring.
+Imports, startup data and backups use the same validation boundary. It checks versions, plan/activity types, duplicate IDs, tools, selected activities, six-digit colours, all grid dimensions and references. Unknown icon strings use the established fallback icon. Validation does not impose plan-count or string-length limits on existing saved data.
 
-## Domain planner helpers
+Invalid startup data enters recovery without automatic overwriting. Original text can be downloaded before replacement or reset. The storage facade resolves window.localStorage inside guarded operations, including browsers that deny access to the storage property itself.
 
-`src/domain/planner.ts` owns shared planner types and pure helpers for deterministic planner behaviour. It currently includes:
+Successful imports first write and verify a backup of current plans, then write and verify the replacement. The UI only adopts successful replacements. Failed imports retain current in-memory plans. Restoration validates the backup before writing it. A write verification failure can mean the browser accepted a write but did not permit the confirming read; the pre-import backup remains the recovery path.
 
-- time label, range label and minute formatting helpers
-- empty-week construction for the seven-day, 288-cell-per-day, five-minute grid
-- allocation summaries for activity minutes, free minutes and the 10,080-minute week total
-- immutable grid range updates that copy the week grid and requested day before painting or erasing a clamped range of underlying five-minute cells
-- structured grouped-block summaries that classify a viewed block as free, a single activity identifier or ordered mixed segments with five-minute cell counts
-- pure plan operations for adding and selecting a constructed plan, renaming a requested plan, duplicating a requested plan with supplied identifiers and deleting a requested plan with the established active-plan fallback
-- simple grid and list helpers used by activity operations and reordering
+Normal changes save the full payload and verify it by reading it back. Failed saves show a visible warning. Startup read failure disables automatic persistence to avoid overwriting inaccessible existing data.
 
-The plan-operation helpers do not generate identifiers, read browser APIs, manage modals or perform validation of interface drafts. Those responsibilities remain in `src/App.tsx` and the persistence boundary. Missing target plans are treated as safe no-ops, and deleting the final remaining plan leaves planner state unchanged. Grid and grouped-block helpers return data only. React presentation remains responsible for activity lookup, colours, icons, CSS gradients, tooltip wording and browser events.
+## View preferences
 
-## View scales
+`week_planner_preferences` stores `{ version: 1, timeScale: '5' | '15' | '60' }` separately from plan data. Missing, malformed or unsupported preferences fall back to the hourly view. Preference failures do not prevent plan use. Plan exports remain version 3 and intentionally do not include device presentation preferences.
 
-The underlying data always remains at five-minute resolution.
+## Undo and redo
 
-The displayed scale groups cells as follows:
+History stores up to 50 immutable planner-state snapshots in memory. A new content edit discards redo. Tool and activity selection changes do not add undo entries. Mouse down begins a paint group; release, cancellation or loss of focus ends it. Name editing groups between focus and blur. A multi-cell paint gesture is one undo step.
 
-- 5-minute view: 1 stored cell
-- 15-minute view: 3 stored cells
-- 1-hour view: 12 stored cells
+Plan deletion and activity deletion can be undone within the session. Successful import, restoration or explicit reset clears edit history because those operations establish a new data baseline. Import recovery uses its separate persisted backup. Reload deliberately clears history.
 
-Mixed grouped blocks are summarised by domain logic and rendered by `App.tsx` as proportional colour stripes. The summary keeps unknown activity identifiers so the presentation layer can apply the established fallback wording and colour.
+## Interaction and accessibility
 
-Painting in a grouped view overwrites every underlying five-minute cell represented by that block. This is established behaviour and must be preserved or deliberately changed as a product decision.
+- Mouse: primary drag paints; secondary drag erases. Same-day gaps between pointer events are filled within the gesture.
+- Touch/pen: primary tap edits on release. Movement beyond 10 CSS pixels, a scroll or cancellation suppresses the pending tap. `touch-action: pan-y` preserves vertical scrolling.
+- Keyboard: the grid has a single roving tab stop. Arrow keys navigate, Home/End move to the start/end of the day, Page Up/Down move an hour, Enter/Space activate the current tool, and Delete/Backspace erase.
+- Undo: Ctrl/Command Z; redo: Ctrl/Command Shift Z or Ctrl Y. Shortcuts do not intercept text inputs or modal editing.
+- Activity reordering: dedicated drag handles plus Move up/down buttons in each activity editor. Pointer cancellation abandons a reorder.
+- Native modal dialogs provide focus containment and Escape dismissal. Focus returns to a usable triggering control. The activities drawer retains its labelled modal role, background inertness and focus trap.
+- Grid labels include day, time range and activity. Mixed labels list the allocation amounts. A live region announces edits.
 
-The baseline review verified that the 15-minute view renders 96 displayed blocks per day, from `00:00-00:15` through `23:45-24:00`.
+## Responsive layout
 
-## Persistence
+The planner measures its own width and shows three to seven consecutive days. Previous/Next move the window one day without altering data. The fixed time column is 56 CSS pixels. A 120-pixel target day width determines expansion, with a minimum of three days retained at narrow widths.
 
-### Browser storage
+At 1280 CSS pixels the activities panel is permanent. Below that width it opens as an overlay drawer. Selecting an activity closes the drawer and returns to the grid controls. Plan management and backups are collected under Plan options; view and undo controls remain visible.
 
-The application continues to use the established storage key:
+Touch and narrow-screen cells are at least 44 CSS pixels tall at every scale. Desktop fine/quarter/hour cells are at least 28/36/44 pixels tall. This trades additional vertical scrolling for reliable selection. A Jump to time control offsets that cost. Visible scrollbars, overscroll containment, dynamic viewport height and safe-area padding improve navigation.
 
-```text
-week_planner_5min_store_v3
-```
+## Verification and deployment
 
-This key was deliberately preserved during the data-safety change. It is still tied to schema version 3, and that is not the intended long-term design, but no storage-key migration has been introduced yet.
+Vitest covers planner calculations, persistence and history. Playwright covers production-build journeys in Chromium and WebKit at 375, 768, 1024 and 1440 pixels, including touch contexts. Browser tests cover save/reload, undo/redo, keyboard editing, modal focus, file backups, invalid imports, restoration, clipboard failure, responsive layout, drag ordering and recovery.
 
-The pre-import backup key is:
+The synthetic swipe regression verifies cancellation logic; it is not a substitute for real-device inertial scrolling or OS gesture testing.
 
-```text
-week_planner_5min_pre_import_backup_v3
-```
+Both `.github/workflows/ci.yml` and `deploy-pages.yml` run installation, lint, unit tests, production build and browser journeys. Browser reports and screenshots are retained as workflow artifacts for 14 days. Deployment proceeds only after checks pass.
 
-The backup key stores a complete version 3 payload. It is not a replacement for the main storage key.
+Vite base remains `/week-planner/`; the existing GitHub Pages origin is retained so saved browser data remains available. Merging to main triggers deployment. A final release should tag a verified main revision and update the package release version deliberately.
 
-The stored payload is:
+## Remaining constraints
 
-```ts
-{
-  version: 3,
-  activePlanId: string | null,
-  plans: Plan[]
-}
-```
-
-The application writes the full payload whenever plans or the active plan change, unless start-up has detected invalid stored data, or browser storage could not be read at start-up. Normal automatic persistence verifies the write by reading the value back. A failed save keeps the application usable and shows a persistent warning that changes are not being saved.
-
-### Version 3 validation boundary
-
-`src/domain/persistence.ts` owns the shared validation boundary for untrusted version 3 data. It accepts `unknown` input and either returns a fully validated payload or a structured validation error with a user-facing message. The same validator is used for JSON imports, browser-stored data and pre-import backups.
-
-The validator checks the top-level object, exact version `3`, non-empty `plans`, `activePlanId`, unique plan identifiers, complete plan structure, activity fields, unique activity identifiers within a plan, six-digit hex colours, 7 by 288 grids, valid grid cells, valid `selectedActivityId` values and `tool` values of only `paint` or `erase`. Plans may have no activities, but only when their grid is empty and `selectedActivityId` is `null`.
-
-A missing or unmatched `activePlanId` remains valid and falls back to the first valid plan. This preserves the active-plan restoration behaviour fixed earlier. Malformed plans are not silently repaired or discarded.
-
-### Start-up ordering and recovery
-
-The application initialises `plans` and `activePlanId` together before the first render by reading the version 3 payload from `localStorage` and validating it.
-
-Start-up behaviour is now:
-
-- valid stored data with an `activePlanId` matching an existing plan restores that plan, even when it is not the first plan
-- valid stored data with a missing or unmatched `activePlanId` falls back deliberately to the first stored plan
-- absent stored data creates and selects the normal default plan
-- malformed, unsupported or structurally invalid stored data enters a recovery state before normal editing begins
-- storage read failure starts from a temporary default plan with automatic persistence disabled for that session, so unknown existing stored data is not overwritten
-
-Recovery mode preserves the original stored text exactly and prevents automatic persistence from overwriting it. The user can download the preserved text, open an empty replacement-import field, import a valid replacement JSON payload, restore a valid pre-import backup when one exists, or explicitly reset Week Planner to a new default plan. Invalid replacement JSON stays in the field for correction. A valid replacement import writes the replacement directly to the main key without creating a backup from the temporary default plan. Resetting requires confirmation and is the only recovery action that intentionally replaces the invalid main stored value with a default payload.
-
-### Import, backup and restore
-
-Imports are validated completely before current in-memory plans are changed. Invalid imports are rejected as a whole, leave the current plans and active plan unchanged, do not create or replace a backup, retain the entered JSON and report the first useful user-facing validation problem.
-
-Before a successful import is applied, the application writes and verifies a complete copy of the current valid payload to `week_planner_5min_pre_import_backup_v3`. If the backup write fails, the import is cancelled and the current plans remain unchanged. The imported payload is then written and verified under `week_planner_5min_store_v3` before the in-memory planner state is replaced.
-
-The import/export interface shows a `Restore previous plans` action when a valid pre-import backup exists. Restoring validates the backup before use, writes and verifies it to the main storage key, leaves current plans unchanged on failure and removes the used backup after a successful restoration where possible.
-
-### Storage-key migration
-
-A future storage-hardening change should migrate from the versioned key to a stable key only after the stable-key behaviour is explicitly agreed and tested. A safe migration would need to preserve a recoverable copy, validate the legacy payload fully, write and verify the new value, and avoid removing the legacy value until recovery is proven.
-
-Do not add migration code for hypothetical versions 1 or 2 unless real historical data is identified.
-
-### Repository history and older versions
-
-The full repository history was inspected during the baseline review.
-
-The initial commit already used:
-
-- `week_planner_5min_store_v3`
-- payload version `3`
-
-No evidence of version 1 or version 2 storage formats exists in repository history. Support for those versions should be added only if real historical data or a pre-repository build is identified. Do not assume that migrations for hypothetical versions are required.
-
-### Schema migration policy
-
-Any future schema change should:
-
-1. retain the version number inside the payload
-2. parse into an unknown or untrusted input type
-3. validate the complete structure
-4. migrate older supported versions through explicit functions
-5. avoid overwriting the original value until migration succeeds
-6. test representative historical payloads
-7. provide a clear recovery path when data cannot be migrated
-
-Do not create a new storage key for each schema version merely to avoid writing a migration.
-
-## State and domain logic
-
-The application currently uses React hooks directly in `App.tsx`:
-
-- `useState` for plans, modal state, tools and interaction state
-- `useEffect` for storage, global listeners and modal behaviour
-- `useMemo` for active-plan lookup, summaries and derived rendering data
-- `useRef` for painting and pointer interaction state
-
-Pure helper functions already exist for operations such as:
-
-- creating an empty week
-- formatting time
-- parsing JSON safely
-- reordering arrays
-- clearing an activity from the grid
-- painting or erasing an immutable grid range
-- summarising grouped grid blocks
-- converting colour values
-
-Further extraction should be incremental. `App.tsx` still owns interaction state, browser effects and rendering concerns.
-
-## Current interactions
-
-### Grid editing
-
-Grid painting uses pointer events per interaction. Primary mouse-button drag applies the active Paint or Erase tool only while the primary button remains held. Secondary mouse-button drag erases only while the secondary button remains held. Global pointer-up, pointer-cancel and window-blur cleanup end an active mouse drag even when release happens outside the grid. Touch and pen interactions remain tap-based, and movement beyond the tap threshold cancels the pending edit so vertical scrolling is preserved.
-
-Right-click always erases.
-
-### Activity ordering
-
-Activity reordering uses pointer events and pointer capture. This is a better cross-input foundation, although it still requires mobile and accessibility testing.
-
-### Modals and destructive actions
-
-Plan operations use in-app modals.
-
-Activity clearing and deletion use inline confirmation states.
-
-Escape closes open plan and import/export modals.
-
-## Layout and styling
-
-The application uses a fixed dark visual theme.
-
-The main content includes:
-
-- an activity sidebar with a fixed width of approximately 360 pixels
-- a planner area with a minimum width of approximately 1,100 pixels
-- a maximum overall width of approximately 1,400 pixels
-- a full-height viewport layout
-- hidden scrollbars
-
-This is strongly desktop-first.
-
-The minimum planner width and hidden scrollbar treatment are likely to cause discoverability and usability problems on phones and smaller tablets. Responsive behaviour should be designed deliberately rather than applied as a superficial CSS adjustment.
-
-## Accessibility considerations
-
-Known areas requiring review include:
-
-- full keyboard editing of the grid
-- screen-reader representation of 2,016 time cells
-- labelled modal semantics
-- focus trapping and focus restoration
-- colour contrast
-- reliance on colour to communicate allocations
-- accessible activity reordering
-- touch target sizing
-- hidden scrollbars
-- right-click-only convenience behaviour
-- user feedback after save, export and import
-
-Accessibility should be designed alongside interaction changes rather than added after a visual redesign.
-
-## Testing
-
-The application now has a formal Vitest unit-test foundation for extracted planner helpers.
-
-The initial helper tests cover:
-
-- week dimensions
-- time labels
-- time-range labels
-- minute formatting
-- JSON parsing
-- array reordering
-- clearing activity cells
-- icon labels
-
-These tests replace the previous development-only `console.assert` checks in `App.tsx`.
-
-### Recommended testing layers
-
-#### Unit tests
-
-Maintain and extend unit tests for:
-
-- time calculations and weekly totals
-- plan operations and activity clearing
-- grouped-block and grid range behaviour
-- import validation
-- schema migration when a storage schema change is approved
-- identifier handling
-
-#### Component tests
-
-Test:
-
-- plan management
-- activity editing
-- paint and erase tool selection
-- grouped-view behaviour
-- confirmation flows
-- import and export interaction
-- active-plan restoration after reload
-
-#### End-to-end tests
-
-Once the structure is stable, cover a small number of critical journeys:
-
-- create and save a plan
-- reload and restore it, including the active plan
-- export and re-import it
-- preserve a recoverable copy before destructive import replacement
-- preserve data across a schema migration
-- edit the grid with supported input methods
-
-## Recommended target structure
-
-The exact folder names should be agreed during refactoring, but responsibilities should move towards a structure similar to:
-
-```text
-src/
-  app/
-  components/
-  domain/
-  storage/
-  test/
-```
-
-A suitable separation would be:
-
-- domain types and pure planner operations
-- schema validation and migration
-- browser persistence
-- reusable interface components
-- plan management
-- activity management
-- weekly grid rendering and interactions
-- application composition
-
-The first refactor should preserve behaviour and visual appearance. Confirmed bugs should be fixed in separate, tested increments rather than hidden inside structural extraction.
-
-## Dependency policy
-
-Do not add a dependency merely to avoid writing a small, clear function.
-
-A new dependency should provide material value in one or more of these areas:
-
-- correctness
-- accessibility
-- data validation
-- testing
-- maintainability
-- a difficult interaction that is unsafe to implement ad hoc
-
-Document the reason for significant additions.
-
-A schema validation library should not be added for the current version 3 boundary. The implemented validator is clear TypeScript and has focused unit coverage.
-
-## Deployment
-
-The application is live at:
-
-https://pat15312.github.io/week-planner/
-
-`vite.config.ts` sets:
-
-```ts
-base: "/week-planner/"
-```
-
-This matches the GitHub Pages project path.
-
-Pull-request quality gates are defined in `.github/workflows/ci.yml`. The workflow runs for pull requests targeting `main` with read-only repository permissions. It checks out the repository, installs Node.js 20 with the npm cache enabled, installs locked dependencies with `npm ci`, then runs `npm run lint`, `npm run test` and `npm run build`. A failing command stops the workflow and reports the pull-request check as failed. It does not deploy anything.
-
-Deployment is defined in `.github/workflows/deploy-pages.yml`. The workflow:
-
-1. runs on pushes to `main` and manual dispatches
-2. checks out the repository
-3. installs Node.js 20 and enables the npm cache
-4. installs locked dependencies with `npm ci`
-5. runs `npm run lint`
-6. runs `npm run test`
-7. runs `npm run build`
-8. uploads `dist` as a GitHub Pages artifact
-9. deploys the artifact to the `github-pages` environment
-
-Linting, automated tests and the production build all run before artifact upload. Any failure prevents the Pages artifact from being uploaded and stops deployment.
-
-During the baseline review, the live application rendered successfully and its generated JavaScript and CSS asset names matched the local production build exactly. This verifies that the reviewed source revision and live deployment produced the same build output.
-
-Do not change the base path without considering the deployed URL and the effect of any origin change on locally stored user data.
-
-## Runtime version policy
-
-GitHub Pages deployment uses Node.js 20. The repository does not currently pin a specific local development version through `engines`, `.nvmrc` or an equivalent file.
-
-A future runtime-policy task should select and document a supported local Node.js version that remains compatible with the deployment environment.
-
-## Security and privacy
-
-The current application:
-
-- has no authentication
-- sends no application data to a project backend
-- stores plan data in the browser
-- accepts user-supplied JSON imports
-
-The absence of a backend reduces the current attack surface, but imported and persisted data must still be validated and bounded.
-
-Do not add analytics, remote logging or cloud storage without an explicit product and privacy decision.
-
-Never commit credentials or personal information to the public repository.
-
-## Native iOS considerations
-
-The current domain can map naturally to Swift:
-
-- `Activity` and `Plan` become Swift models
-- the 7 by 288 allocation grid can remain the portable logical representation
-- browser persistence becomes SwiftData, a file format or another deliberately chosen local store
-- JSON export can provide a compatibility bridge
-- React state becomes observable SwiftUI state
-
-The native application should not translate desktop interactions literally.
-
-In particular:
-
-- right-click erase needs a touch-appropriate replacement
-- a full-week grid needs responsive navigation and zooming
-- drag painting needs careful gesture design
-- context menus, toolbars, haptics and accessibility should use native patterns
-
-The web application should first become a clear, tested specification for the product's behaviour.
-
-## Known unknowns
-
-The following items remain to be confirmed:
-
-- supported browser versions
-- current behaviour across representative phones and tablets
-- exact touch and keyboard interaction models
-- the appropriate long-term local Node.js version
-- whether any real pre-repository storage format exists outside repository history
-
-## Responsive narrow-screen implementation
-
-The first responsive planner slice was implemented on 17 July 2026.
-
-The activities-layout breakpoint is the Tailwind `xl` breakpoint, 1280 CSS pixels. Below that breakpoint, the activities panel is available through the overlay drawer. At and above `xl`, the established permanently visible activities sidebar remains in use.
-
-The planner grid measures its own available width with `ResizeObserver`, subtracts the rendered time-column width, and calculates a visible day count from the target usable day-column width of 120 CSS pixels. The time column is controlled by a CSS custom property, 64 CSS pixels below `xl` and 84 CSS pixels at and above `xl`, and the measurement reads the rendered header width rather than duplicating that breakpoint in JavaScript. The result is clamped from three to seven days. `App.tsx` renders only the calculated consecutive day window, generates the grid column template from that count and renders partial-week navigation whenever fewer than seven days are visible, independent of the activities-layout breakpoint. The day-window start and visible count are React interface state only. They are not part of `Plan`, the version 3 persisted payload, import or export. The helper functions `calculateVisibleDayCount`, `clampDayWindowStart`, `moveDayWindow` and `dayWindowIndices` live in `src/domain/planner.ts` so the responsive windows and underlying day indices are testable without coupling to React.
-
-The narrow activities interface reuses the existing activities panel through a single render helper. Desktop places it in the permanent sidebar, while narrow layouts place the same panel inside an overlay drawer. The drawer closes through its Close control, Escape and backdrop selection. While open, it applies `inert` to the background planner, moves focus to the drawer Close button, traps Tab and Shift+Tab within drawer controls, and restores focus to the opener when it closes within the narrow layout. If the viewport enters the desktop `xl` breakpoint while the drawer is open, the drawer closes without trying to restore focus to the now-hidden narrow Activities button.
-
-Grid input handling uses pointer events for planner cells. Mouse input preserves the established editing model while adding button-state safeguards: primary mouse-down paints or erases with the active tool, secondary mouse-down erases, drag editing continues only while the required button bit remains present on `PointerEvent.buttons`, and pointer release, cancellation or window blur clears the drag state. Touch and pen input create a pending single edit on pointer down, apply it on pointer up only when movement stays within a small tap threshold, and cancel it on scrolling movement or pointer cancellation. The touch path does not call `preventDefault`, so vertical scrolling remains a browser interaction rather than a planner painting gesture.
+No synchronisation, multi-tab conflict resolution or offline service worker is introduced. Large plan collections cause larger synchronous storage writes and history snapshots; the history bound limits growth but does not establish a performance guarantee. Real-device and assistive-technology acceptance remain required before declaring those experiences verified.
