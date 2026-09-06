@@ -21,7 +21,7 @@ button:disabled { cursor: default; opacity: .45; }
 .hour-cell { min-height: 44px; }
 .drag-handle { min-height: 44px; min-width: 32px; }
 @media (pointer: coarse), (max-width: 767px) {
-  .planner-cell { min-height: 44px; }
+  .planner-cell, button { min-height: 44px; }
   input, select, textarea { font-size: 16px; }
   .app-dialog { padding: 16px; }
 }

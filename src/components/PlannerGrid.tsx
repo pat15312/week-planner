@@ -93,6 +93,7 @@ export function PlannerGrid({ plan, step, onPaint, beginGesture, endGesture }: P
     let nextDay = day;
     let nextRow = row;
     switch (event.key) {
+      case 'Enter': case ' ': event.preventDefault(); beginGesture(); paint(day, row); endGesture(); return;
       case 'ArrowUp': nextRow -= step; break;
       case 'ArrowDown': nextRow += step; break;
       case 'ArrowLeft': nextDay--; break;

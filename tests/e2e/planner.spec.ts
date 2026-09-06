@@ -54,10 +54,16 @@ test('keyboard editing and modal focus are usable', async ({ page }) => {
   await option(page, 'Rename plan');
   const dialog = page.getByRole('dialog', { name: 'Rename plan' });
   await expect(dialog).toBeVisible();
-  for (let i = 0; i < 8; i++) {
-    await page.keyboard.press('Tab');
-    expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
-  }
+  const nameInput = dialog.getByRole('textbox', { name: 'Plan name' });
+  await expect(nameInput).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Save plan', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Close Rename plan', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(nameInput).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
 });
@@ -169,4 +175,17 @@ test('invalid stored data survives recovery and a replacement remeasures the gri
   await expect(page.getByRole('grid')).toBeVisible();
   const expectedDays = await page.locator('.planner-scroll').evaluate(el => Math.min(7, Math.max(3, Math.floor((el.clientWidth - 56) / 120))));
   await expect(page.getByRole('columnheader')).toHaveCount(expectedDays + 1);
+});
+
+test('denied browser storage still permits editing and file export', async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('Denied', 'SecurityError'); } }));
+  await page.reload();
+  await expect(page.getByRole('grid')).toBeVisible();
+  await expect(page.getByText('Browser storage could not be read. Changes may not be saved.', { exact: true })).toBeVisible();
+  await page.getByRole('gridcell', { name: 'Mon 00:00-01:00: Free', exact: true }).click();
+  await expect(page.getByRole('gridcell', { name: 'Mon 00:00-01:00: Work', exact: true })).toBeVisible();
+  await option(page, 'Export backup');
+  const downloadEvent = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download backup', exact: true }).click();
+  expect((await downloadEvent).suggestedFilename()).toContain('week-planner-');
 });
