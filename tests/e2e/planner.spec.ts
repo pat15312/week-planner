@@ -58,14 +58,14 @@ test('keyboard editing and modal focus are usable', async ({ page }) => {
   await expect.poll(() => dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
   await nameInput.focus();
   await expect(nameInput).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Close Rename plan', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(nameInput).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(dialog.getByRole('button', { name: 'Save plan', exact: true })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(dialog.getByRole('button', { name: 'Close Rename plan', exact: true })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(nameInput).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
 });
